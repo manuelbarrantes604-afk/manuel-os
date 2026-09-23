@@ -1,23 +1,33 @@
 :root {
-  --bg: #070809;
-  --surface: #101214;
-  --surface-2: #16191d;
-  --border: rgba(255, 255, 255, 0.07);
-  --text: #f3f4f6;
-  --text-soft: #c4c8d0;
-  --muted: #8b919c;
-  --gold: #d4a017;
-  --teal: #2dd4bf;
-  --danger: #f87171;
+  --bg: #f6f7f8;
+  --bg-soft: #eef0f2;
+  --surface: #ffffff;
+  --surface-2: #f3f5f6;
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.12);
+  --text: #1a1d21;
+  --text-soft: #3d4450;
+  --muted: #6b7280;
+  --green: #0aad0a;
+  --green-dark: #088a08;
+  --green-soft: rgba(10, 173, 10, 0.12);
+  --amber: #e8a317;
+  --amber-soft: rgba(232, 163, 23, 0.14);
+  --danger: #e11d48;
+  --danger-soft: rgba(225, 29, 72, 0.12);
+  --shadow: 0 4px 16px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  color-scheme: dark;
+  --radius: 20px;
+  --radius-sm: 14px;
+  color-scheme: light;
   font-family: var(--sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.4;
+  line-height: 1.45;
   font-weight: 400;
   color: var(--text);
   background: var(--bg);
@@ -38,16 +48,18 @@ body,
 
 body {
   min-width: 320px;
+  background: var(--bg);
 }
 
 button {
   color: inherit;
+  font-family: inherit;
 }
 
 a {
-  color: var(--teal);
+  color: var(--green);
 }
 
 ::selection {
-  background: rgba(212, 160, 23, 0.35);
+  background: rgba(10, 173, 10, 0.22);
 }

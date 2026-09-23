@@ -51,6 +51,27 @@ export const CHECK_DEFS = [
   },
 ];
 
+export const DAY_PARTS = [
+  {
+    id: 'morning',
+    title: 'Morning',
+    coachLine: 'Win the morning, win the day. Faith first, then the body.',
+    checkIds: ['wake', 'leave', 'exercise'],
+  },
+  {
+    id: 'midday',
+    title: 'Midday',
+    coachLine: 'Lock three priorities. Protect family time. No drift.',
+    checkIds: ['midday'],
+  },
+  {
+    id: 'night',
+    title: 'Night',
+    coachLine: 'Close the loop. Fuel logged. Lights out by 8:30.',
+    checkIds: ['calories', 'sleep'],
+  },
+];
+
 export const VALUES = [
   {
     id: 'faith',
@@ -123,8 +144,8 @@ export const SEED_DAYS = {
       },
       midday: {
         status: 'PENDING',
-        time: '—',
-        note: 'Not due yet',
+        time: '12:41pm',
+        note: 'Check fired ~12:41 — still waiting on your reply',
       },
       calories: {
         status: 'PENDING',
@@ -141,7 +162,7 @@ export const SEED_DAYS = {
       ran: false,
       title: 'Evening review — Day 2',
       score: null,
-      body: 'Review opens after sleep check. Morning stack already needs a reset.',
+      body: 'Review opens after sleep check. Morning stack already needs a reset. Midday fired — reply when priorities are locked.',
       wins: [],
       misses: [],
     },
@@ -164,5 +185,5 @@ export const STREAKS = [
   { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v1';
+export const STORAGE_KEY = 'manuel-os-v2';
 export const TODAY_KEY = '2026-09-23';
