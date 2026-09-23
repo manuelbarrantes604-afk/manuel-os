@@ -1,4 +1,6 @@
-/** Seed data for Manuel OS — W39 2026 */
+/** Seed data for Manuel OS — W39 2026 + blank-day factory */
+
+import { formatDayLabel, weekLabel } from '../lib/time';
 
 export const CHECK_DEFS = [
   {
@@ -19,7 +21,7 @@ export const CHECK_DEFS = [
   },
   {
     id: 'exercise',
-    label: 'Exercise photo',
+    label: 'Exercise',
     target: '6:00am',
     dueHour: 6,
     dueMinute: 30,
@@ -36,7 +38,7 @@ export const CHECK_DEFS = [
   {
     id: 'calories',
     label: 'Cal AI calories',
-    target: 'screenshot',
+    target: 'evening',
     dueHour: 20,
     dueMinute: 0,
     proof: true,
@@ -72,7 +74,6 @@ export const DAY_PARTS = [
   },
 ];
 
-
 export const IMPROVE_TIPS = {
   wake: {
     title: 'Wake 5:00',
@@ -83,20 +84,20 @@ export const IMPROVE_TIPS = {
     tip: 'Shoes on by 5:25. Confirm leave in chat. Discipline is the clock, not the mood.',
   },
   exercise: {
-    title: 'Exercise photo 6:00',
-    tip: 'Photo is the proof. No text-only. Health is earned in the frame you send.',
+    title: 'Exercise 6:00',
+    tip: 'Photo is the proof (in chat). No text-only. Health is earned in the work you do.',
   },
   midday: {
     title: 'Midday priorities',
     tip: 'Lock three priorities in writing. Protect family time. Name the work — no drift.',
   },
   calories: {
-    title: 'Cal AI screenshot',
-    tip: 'Screenshot before dinner winds down. Fuel logged is honesty. Intentions do not burn calories.',
+    title: 'Cal AI calories',
+    tip: 'Log before dinner winds down. Fuel logged is honesty. Intentions do not burn calories.',
   },
   sleep: {
     title: 'Sleep by 8:30',
-    tip: 'Lights out protects tomorrow\'s morning. Phone down. Win the night so Faith can lead at 5:00.',
+    tip: "Lights out protects tomorrow's morning. Phone down. Win the night so Faith can lead at 5:00.",
   },
 };
 
@@ -126,6 +127,31 @@ export const GOALS = [
   { id: 'family', title: 'Family', meta: 'Present & protective', progress: 70 },
   { id: 'strength', title: 'Fitness / emotional strength', meta: 'Hard body, calm mind', progress: 35 },
 ];
+
+export function blankDay(dateKey) {
+  const checks = {};
+  for (const def of CHECK_DEFS) {
+    checks[def.id] = {
+      status: 'PENDING',
+      time: '—',
+      note: 'Not graded yet',
+    };
+  }
+  return {
+    date: dateKey,
+    week: weekLabel(dateKey),
+    label: formatDayLabel(dateKey),
+    checks,
+    review: {
+      ran: false,
+      title: 'Evening review',
+      score: null,
+      body: 'Review opens when every check is Pass or Fail.',
+      wins: [],
+      misses: [],
+    },
+  };
+}
 
 /** Tue Sep 22 — first day of stack, rough execution */
 export const SEED_DAYS = {
@@ -178,7 +204,7 @@ export const SEED_DAYS = {
       calories: {
         status: 'PENDING',
         time: '—',
-        note: 'Awaiting Cal AI screenshot',
+        note: 'Awaiting Cal AI log',
       },
       sleep: {
         status: 'PENDING',
@@ -197,21 +223,16 @@ export const SEED_DAYS = {
   },
 };
 
-export const WEEK_STRIP = [
-  { key: '2026-09-21', dow: 'Mon', pct: null, empty: true },
-  { key: '2026-09-22', dow: 'Tue', pct: 17, empty: false },
-  { key: '2026-09-23', dow: 'Wed', pct: null, empty: false, today: true },
-  { key: '2026-09-24', dow: 'Thu', pct: null, empty: true },
-  { key: '2026-09-25', dow: 'Fri', pct: null, empty: true },
-  { key: '2026-09-26', dow: 'Sat', pct: null, empty: true },
-  { key: '2026-09-27', dow: 'Sun', pct: null, empty: true },
-];
-
 export const STREAKS = [
   { id: 'wake', label: 'Wake 5:00', count: 0, unit: 'days' },
   { id: 'exercise', label: 'Exercise', count: 0, unit: 'days' },
   { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v4';
-export const TODAY_KEY = '2026-09-23';
+export const STORAGE_KEY = 'manuel-os-v5';
+
+export const PRIORITY_PLACEHOLDERS = [
+  'Family dinner present',
+  'Manuel OS iteration',
+  'AI learning block',
+];

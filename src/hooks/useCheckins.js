@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CHECK_DEFS, SEED_DAYS, STORAGE_KEY, TODAY_KEY } from '../data/seed';
+import { blankDay, CHECK_DEFS, SEED_DAYS, STORAGE_KEY } from '../data/seed';
+import { getNyParts, weekStripFor } from '../lib/time';
 
 function cloneSeed() {
   return structuredClone(SEED_DAYS);
@@ -18,6 +19,7 @@ function loadState() {
 
 function nowTime() {
   return new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/New_York',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -55,13 +57,30 @@ function calcDayStats(checks) {
 }
 
 export function useCheckins() {
-  const [days, setDays] = useState(loadState);
+  const ny = useMemo(() => getNyParts(), []);
+  const todayKey = ny.dateKey;
+
+  const [days, setDays] = useState(() => {
+    const initial = loadState();
+    if (!initial[todayKey]) {
+      initial[todayKey] = blankDay(todayKey);
+    }
+    return initial;
+  });
+
+  // Ensure today exists if date rolls over in a long session
+  useEffect(() => {
+    setDays((prev) => {
+      if (prev[todayKey]) return prev;
+      return { ...prev, [todayKey]: blankDay(todayKey) };
+    });
+  }, [todayKey]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(days));
   }, [days]);
 
-  const today = days[TODAY_KEY];
+  const today = days[todayKey];
 
   const todayPct = useMemo(
     () => calcPct(today?.checks || {}),
@@ -73,29 +92,33 @@ export function useCheckins() {
     [today],
   );
 
-  const setStatus = useCallback((checkId, status) => {
-    if (status !== 'PASS' && status !== 'FAIL') return;
-    setDays((prev) => {
-      const day = prev[TODAY_KEY];
-      if (!day) return prev;
-      const prevRow = day.checks[checkId] || {};
-      return {
-        ...prev,
-        [TODAY_KEY]: {
-          ...day,
-          checks: {
-            ...day.checks,
-            [checkId]: {
-              ...prevRow,
-              status,
-              time: nowTime(),
-              note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
+  const setStatus = useCallback(
+    (checkId, status) => {
+      if (status !== 'PASS' && status !== 'FAIL') return;
+      setDays((prev) => {
+        const day = prev[todayKey] || blankDay(todayKey);
+        const prevRow = day.checks[checkId] || {};
+        return {
+          ...prev,
+          [todayKey]: {
+            ...day,
+            checks: {
+              ...day.checks,
+              [checkId]: {
+                ...prevRow,
+                status,
+                time: nowTime(),
+                note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
+              },
             },
           },
-        },
-      };
-    });
-  }, []);
+        };
+      });
+    },
+    [todayKey],
+  );
+
+  const weekStrip = useMemo(() => weekStripFor(todayKey), [todayKey]);
 
   const weekPcts = useMemo(() => {
     const map = {};
@@ -105,12 +128,33 @@ export function useCheckins() {
     return map;
   }, [days]);
 
+  const weekHonesty = useMemo(() => {
+    const scored = weekStrip
+      .map((d) => weekPcts[d.key])
+      .filter((p) => p != null);
+    if (!scored.length) {
+      return { avg: null, count: 0, line: 'No graded days yet this week.' };
+    }
+    const avg = Math.round(
+      scored.reduce((a, b) => a + b, 0) / scored.length,
+    );
+    let line;
+    if (avg < 50) line = 'Below standard. Fix the morning stack.';
+    else if (avg < 80) line = 'Partial. Close open items.';
+    else line = 'On standard. Protect it.';
+    return { avg, count: scored.length, line };
+  }, [weekStrip, weekPcts]);
+
   return {
     days,
     today,
+    todayKey,
     todayPct,
     todayStats,
     weekPcts,
+    weekStrip,
+    weekHonesty,
+    ny,
     setStatus,
   };
 }

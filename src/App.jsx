@@ -4,11 +4,15 @@ import {
   DAY_PARTS,
   GOALS,
   IMPROVE_TIPS,
+  PRIORITY_PLACEHOLDERS,
   STREAKS,
-  TODAY_KEY,
-  WEEK_STRIP,
 } from './data/seed';
 import { useCheckins } from './hooks/useCheckins';
+import { usePriorities } from './hooks/usePriorities';
+import {
+  activePeriodId,
+  getNextUp,
+} from './lib/time';
 import './App.css';
 
 const NAV = [
@@ -30,6 +34,15 @@ function greetingForHour(h) {
   return 'Good evening';
 }
 
+function scrollToCheck(checkId) {
+  const el = document.getElementById(`check-${checkId}`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash-focus');
+    window.setTimeout(() => el.classList.remove('flash-focus'), 1200);
+  }
+}
+
 function ScorePill({ pct }) {
   const tone =
     pct == null ? 'muted' : pct >= 80 ? 'hot' : pct >= 50 ? 'mid' : 'cold';
@@ -40,8 +53,33 @@ function ScorePill({ pct }) {
   );
 }
 
-function TodayHeader({ pct, dateLabel }) {
-  const hour = new Date().getHours();
+function NextUpCard({ nextUp }) {
+  if (!nextUp) return null;
+
+  if (nextUp.closed) {
+    return (
+      <button type="button" className="next-up closed" disabled>
+        <span className="next-up-kicker">Next up</span>
+        <span className="next-up-title">{nextUp.label}</span>
+      </button>
+    );
+  }
+
+  const def = CHECK_BY_ID[nextUp.id];
+  return (
+    <button
+      type="button"
+      className="next-up"
+      onClick={() => scrollToCheck(nextUp.id)}
+    >
+      <span className="next-up-kicker">Next up</span>
+      <span className="next-up-title">{def?.label || nextUp.id}</span>
+      <span className="next-up-meta">{def?.target} · tap to jump</span>
+    </button>
+  );
+}
+
+function TodayHeader({ pct, dateLabel, week, hour, nextUp }) {
   const greeting = greetingForHour(hour);
 
   return (
@@ -50,22 +88,58 @@ function TodayHeader({ pct, dateLabel }) {
         <div>
           <p className="hello">{greeting}, Manuel</p>
           <h1>Today</h1>
-          <p className="date-line">{dateLabel} · Week 39</p>
+          <p className="date-line">
+            {dateLabel} · {week}
+          </p>
         </div>
         <ScorePill pct={pct} />
       </div>
       <p className="coach-banner">
         Faith. Health. Discipline. Family. Execution — not intentions.
       </p>
+      <NextUpCard nextUp={nextUp} />
     </header>
   );
 }
 
-function CheckRow({ def, row, setStatus }) {
+function MiddayPriorities({ priorities, setPriority, showHint }) {
+  return (
+    <div className="midday-priorities">
+      <div className="midday-pri-head">
+        <strong>Top 3 today</strong>
+        <span>Auto-saves</span>
+      </div>
+      <ol className="priority-inputs">
+        {priorities.map((value, i) => (
+          <li key={i}>
+            <span className="pri-num">{i + 1}</span>
+            <input
+              type="text"
+              value={value}
+              placeholder={PRIORITY_PLACEHOLDERS[i]}
+              onChange={(e) => setPriority(i, e.target.value)}
+              onBlur={(e) => setPriority(i, e.target.value.trim())}
+              maxLength={80}
+              aria-label={`Priority ${i + 1}`}
+            />
+          </li>
+        ))}
+      </ol>
+      {showHint && (
+        <p className="priority-hint">Lock at least one priority.</p>
+      )}
+    </div>
+  );
+}
+
+function CheckRow({ def, row, setStatus, highlight }) {
   const status = row?.status || 'PENDING';
 
   return (
-    <li className={`check-row ${statusClass(status)}`}>
+    <li
+      id={`check-${def.id}`}
+      className={`check-row ${statusClass(status)} ${highlight ? 'is-next' : ''}`}
+    >
       <div className="check-body full">
         <div className="check-top">
           <strong>{def.label}</strong>
@@ -99,7 +173,14 @@ function CheckRow({ def, row, setStatus }) {
   );
 }
 
-function PeriodCard({ part, today, setStatus }) {
+function PeriodCard({
+  part,
+  today,
+  setStatus,
+  isActive,
+  nextCheckId,
+  prioritiesSlot,
+}) {
   const rows = part.checkIds.map((id) => ({
     def: CHECK_BY_ID[id],
     row: today.checks[id],
@@ -109,16 +190,23 @@ function PeriodCard({ part, today, setStatus }) {
   const total = rows.length;
 
   return (
-    <article className="period-card">
+    <article
+      className={`period-card ${isActive ? 'period-active' : ''}`}
+      id={`period-${part.id}`}
+    >
       <div className="period-head">
         <div>
-          <h2>{part.title}</h2>
+          <h2>
+            {part.title}
+            {isActive && <span className="now-badge">Now</span>}
+          </h2>
           <p className="coach-line">{part.coachLine}</p>
         </div>
         <span className="period-count">
           {done}/{total}
         </span>
       </div>
+      {prioritiesSlot}
       <ul className="check-list">
         {rows.map(({ def, row }) => (
           <CheckRow
@@ -126,6 +214,7 @@ function PeriodCard({ part, today, setStatus }) {
             def={def}
             row={row}
             setStatus={setStatus}
+            highlight={nextCheckId === def.id}
           />
         ))}
       </ul>
@@ -187,7 +276,6 @@ function DayResultCard({ stats }) {
   );
 }
 
-/** Gaps only after the day is fully graded (no PENDING left). */
 function ImprovementCard({ stats }) {
   if (!stats || !stats.allGraded || stats.failCount === 0) return null;
 
@@ -201,7 +289,9 @@ function ImprovementCard({ stats }) {
     <section className="card improve-card" aria-live="polite">
       <div className="card-head">
         <h2>Today&apos;s gaps</h2>
-        <span className="card-sub">What to change · Faith · Health · Discipline</span>
+        <span className="card-sub">
+          What to change · Faith · Health · Discipline
+        </span>
       </div>
       <p className="improve-lead">
         Day is graded. Fix these for tomorrow — specific actions, not pep talk.
@@ -218,12 +308,33 @@ function ImprovementCard({ stats }) {
   );
 }
 
-function TodayView({ today, todayPct, todayStats, setStatus }) {
-  const dateLabel = today?.label || 'Wed Sep 23';
+function TodayView({
+  today,
+  todayPct,
+  todayStats,
+  setStatus,
+  ny,
+  todayKey,
+}) {
+  const { priorities, setPriority, filledCount } = usePriorities(todayKey);
+  const nextUp = useMemo(
+    () => getNextUp(today?.checks || {}, ny.hour, ny.minute),
+    [today, ny.hour, ny.minute],
+  );
+  const activePart = activePeriodId(ny.hour);
+  const middayStatus = today?.checks?.midday?.status;
+  const showPriHint =
+    middayStatus === 'PASS' && filledCount === 0;
 
   return (
     <div className="view today-view">
-      <TodayHeader pct={todayPct} dateLabel={dateLabel} />
+      <TodayHeader
+        pct={todayPct}
+        dateLabel={today?.label || 'Today'}
+        week={today?.week || 'W—'}
+        hour={ny.hour}
+        nextUp={nextUp}
+      />
       <DayResultCard stats={todayStats} />
       <ImprovementCard stats={todayStats} />
       <div className="period-stack">
@@ -233,6 +344,17 @@ function TodayView({ today, todayPct, todayStats, setStatus }) {
             part={part}
             today={today}
             setStatus={setStatus}
+            isActive={activePart === part.id}
+            nextCheckId={nextUp.closed ? null : nextUp.id}
+            prioritiesSlot={
+              part.id === 'midday' ? (
+                <MiddayPriorities
+                  priorities={priorities}
+                  setPriority={setPriority}
+                  showHint={showPriHint}
+                />
+              ) : null
+            }
           />
         ))}
       </div>
@@ -240,14 +362,23 @@ function TodayView({ today, todayPct, todayStats, setStatus }) {
   );
 }
 
-function ProgressView({ days, weekPcts, todayPct }) {
+function ProgressView({
+  days,
+  weekPcts,
+  todayPct,
+  weekStrip,
+  weekHonesty,
+  todayKey,
+}) {
   const strip = useMemo(
     () =>
-      WEEK_STRIP.map((d) => ({
-        ...d,
-        pct: d.key === TODAY_KEY ? todayPct : weekPcts[d.key] ?? d.pct,
-      })),
-    [weekPcts, todayPct],
+      weekStrip.map((d) => {
+        const pct =
+          d.key === todayKey ? todayPct : weekPcts[d.key] ?? d.pct;
+        const empty = pct == null && !d.today && !days[d.key];
+        return { ...d, pct, empty };
+      }),
+    [weekStrip, weekPcts, todayPct, todayKey, days],
   );
 
   const latestReview = useMemo(() => {
@@ -256,15 +387,39 @@ function ProgressView({ days, weekPcts, todayPct }) {
       const day = days[k];
       if (day?.review?.ran) return day;
     }
-    return days[TODAY_KEY] || null;
-  }, [days]);
+    return days[todayKey] || null;
+  }, [days, todayKey]);
+
+  const honestyTone =
+    weekHonesty.avg == null
+      ? 'muted'
+      : weekHonesty.avg >= 80
+        ? 'hot'
+        : weekHonesty.avg >= 50
+          ? 'mid'
+          : 'cold';
 
   return (
     <div className="view progress-view">
       <header className="progress-header">
         <h1>Progress</h1>
-        <p className="date-line">Week 39 · keep the streak honest</p>
+        <p className="date-line">This week · keep the streak honest</p>
       </header>
+
+      <section className="card honesty-card">
+        <div className="card-head">
+          <h2>Week honesty</h2>
+          <span className="card-sub">
+            {weekHonesty.count
+              ? `${weekHonesty.count} graded day${weekHonesty.count === 1 ? '' : 's'}`
+              : 'No graded days'}
+          </span>
+        </div>
+        <div className={`honesty-score tone-${honestyTone}`}>
+          {weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`}
+        </div>
+        <p className="honesty-line">{weekHonesty.line}</p>
+      </section>
 
       <section className="card">
         <div className="card-head">
@@ -354,16 +509,36 @@ function ProgressView({ days, weekPcts, todayPct }) {
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v4</p>
+        <p>Manuel OS · local only · v5</p>
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  const { days, today, todayPct, todayStats, weekPcts, setStatus } =
-    useCheckins();
+  const {
+    days,
+    today,
+    todayKey,
+    todayPct,
+    todayStats,
+    weekPcts,
+    weekStrip,
+    weekHonesty,
+    ny,
+    setStatus,
+  } = useCheckins();
   const [tab, setTab] = useState('today');
+
+  if (!today) {
+    return (
+      <div className="mos-shell">
+        <div className="mos-frame">
+          <p className="date-line">Loading today…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mos-shell">
@@ -375,12 +550,17 @@ export default function App() {
               todayPct={todayPct}
               todayStats={todayStats}
               setStatus={setStatus}
+              ny={ny}
+              todayKey={todayKey}
             />
           ) : (
             <ProgressView
               days={days}
               weekPcts={weekPcts}
               todayPct={todayPct}
+              weekStrip={weekStrip}
+              weekHonesty={weekHonesty}
+              todayKey={todayKey}
             />
           )}
         </main>
