@@ -1,9 +1,9 @@
 /**
  * First-load follow-ups seed (Sep 23–Oct 1 2026 + October month).
- * Seeded only when manuel-os-followups-v1 is empty.
+ * Seeded only when manuel-os-followups-v2 is empty.
  */
 
-export const FOLLOWUPS_STORAGE_KEY = 'manuel-os-followups-v1';
+export const FOLLOWUPS_STORAGE_KEY = 'manuel-os-followups-v2';
 
 const CREATED = '2026-09-23T12:00:00.000-04:00';
 
@@ -12,8 +12,8 @@ const CREATED = '2026-09-23T12:00:00.000-04:00';
 /** @type {Followup[]} */
 export const FOLLOWUPS_SEED = [
   {
-    id: 'fu-0923-stack',
-    title: 'Reset morning stack — wake / leave / move',
+    id: 'fu-0923-biz-whf',
+    title: 'Biz meeting + WHF questions',
     due: '2026-09-23',
     month: null,
     done: false,
@@ -21,17 +21,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0923-ai',
-    title: 'Protect 1hr AI block after exercise',
-    due: '2026-09-23',
-    month: null,
-    done: false,
-    doneAt: null,
-    createdAt: CREATED,
-  },
-  {
-    id: 'fu-0924-cal',
-    title: 'Cal AI evening review — honest grades',
+    id: 'fu-0924-uber-marina',
+    title: 'Uber Marina Bentonville',
     due: '2026-09-24',
     month: null,
     done: false,
@@ -39,17 +30,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0924-weight',
-    title: 'Log morning weight · stay on the scale',
-    due: '2026-09-24',
-    month: null,
-    done: false,
-    doneAt: null,
-    createdAt: CREATED,
-  },
-  {
-    id: 'fu-0925-family',
-    title: 'Friday family presence — phone down',
+    id: 'fu-0925-springdale-cleaning',
+    title: 'Springdale Cleaning',
     due: '2026-09-25',
     month: null,
     done: false,
@@ -57,8 +39,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0925-prep',
-    title: 'Prep Saturday 3am drop — keys, bags, route',
+    id: 'fu-0925-loa-approval',
+    title: 'LOA approval',
     due: '2026-09-25',
     month: null,
     done: false,
@@ -66,7 +48,7 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0926-dunia',
+    id: 'fu-0926-dunia-trucks',
     title: '3am: Drop Dunia + Trucks Rental',
     due: '2026-09-26',
     month: null,
@@ -76,8 +58,8 @@ export const FOLLOWUPS_SEED = [
     earlySurface: true,
   },
   {
-    id: 'fu-0927-recover',
-    title: 'Sunday recovery walk · no negotiations',
+    id: 'fu-0927-church-dima',
+    title: 'Church + Dima Clean Bentonville',
     due: '2026-09-27',
     month: null,
     done: false,
@@ -85,8 +67,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0928-week',
-    title: 'Monday plan: week non-negotiables on calendar',
+    id: 'fu-0928-dima-clean',
+    title: 'Dima Clean Springdale',
     due: '2026-09-28',
     month: null,
     done: false,
@@ -94,8 +76,26 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0929-mos',
-    title: 'Ship Manuel OS follow-through — use the tool',
+    id: 'fu-0928-photo-shoot',
+    title: 'Photo Shoot 2pm Airbnb',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0928-paycheck',
+    title: 'Check Paycheck',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0929-ivania-dima',
+    title: 'Ivania take Dima Bus station',
     due: '2026-09-29',
     month: null,
     done: false,
@@ -103,8 +103,17 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-0930-close',
-    title: 'Month-end: close open loops before Oct',
+    id: 'fu-0929-josh-lunch',
+    title: 'Remind Josh O Friday Lunch',
+    due: '2026-09-29',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-dima-ultra',
+    title: 'Pick Dima + Ultra Ring',
     due: '2026-09-30',
     month: null,
     done: false,
@@ -112,8 +121,26 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-1001-start',
-    title: 'Oct 1: start-of-month execution review',
+    id: 'fu-0930-laura-receipt',
+    title: 'Laura $3500 (Receipt install)',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-pack-clothes',
+    title: 'Pack clothes',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-1001-holocaust-baltimore',
+    title: 'Holocaust + Baltimore',
     due: '2026-10-01',
     month: null,
     done: false,
@@ -121,8 +148,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-oct-lbs',
-    title: 'October: stay on the 30-lb cut path',
+    id: 'fu-oct-turno-marvin-health',
+    title: 'Turno + Marvin Pay + Health Plans',
     due: null,
     month: '2026-10',
     done: false,
@@ -130,17 +157,8 @@ export const FOLLOWUPS_SEED = [
     createdAt: CREATED,
   },
   {
-    id: 'fu-oct-hm',
-    title: 'October: half-marathon training blocks',
-    due: null,
-    month: '2026-10',
-    done: false,
-    doneAt: null,
-    createdAt: CREATED,
-  },
-  {
-    id: 'fu-oct-family',
-    title: 'October: weekly family night protected',
+    id: 'fu-oct-factor',
+    title: 'Order Factor',
     due: null,
     month: '2026-10',
     done: false,
