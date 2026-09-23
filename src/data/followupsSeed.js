@@ -1,0 +1,150 @@
+/**
+ * First-load follow-ups seed (Sep 23–Oct 1 2026 + October month).
+ * Seeded only when manuel-os-followups-v1 is empty.
+ */
+
+export const FOLLOWUPS_STORAGE_KEY = 'manuel-os-followups-v1';
+
+const CREATED = '2026-09-23T12:00:00.000-04:00';
+
+/** @typedef {{ id: string, title: string, due: string|null, month: string|null, done: boolean, doneAt: string|null, createdAt: string, earlySurface?: boolean }} Followup */
+
+/** @type {Followup[]} */
+export const FOLLOWUPS_SEED = [
+  {
+    id: 'fu-0923-stack',
+    title: 'Reset morning stack — wake / leave / move',
+    due: '2026-09-23',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0923-ai',
+    title: 'Protect 1hr AI block after exercise',
+    due: '2026-09-23',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0924-cal',
+    title: 'Cal AI evening review — honest grades',
+    due: '2026-09-24',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0924-weight',
+    title: 'Log morning weight · stay on the scale',
+    due: '2026-09-24',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0925-family',
+    title: 'Friday family presence — phone down',
+    due: '2026-09-25',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0925-prep',
+    title: 'Prep Saturday 3am drop — keys, bags, route',
+    due: '2026-09-25',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0926-dunia',
+    title: '3am: Drop Dunia + Trucks Rental',
+    due: '2026-09-26',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+    earlySurface: true,
+  },
+  {
+    id: 'fu-0927-recover',
+    title: 'Sunday recovery walk · no negotiations',
+    due: '2026-09-27',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0928-week',
+    title: 'Monday plan: week non-negotiables on calendar',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0929-mos',
+    title: 'Ship Manuel OS follow-through — use the tool',
+    due: '2026-09-29',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-close',
+    title: 'Month-end: close open loops before Oct',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-1001-start',
+    title: 'Oct 1: start-of-month execution review',
+    due: '2026-10-01',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-oct-lbs',
+    title: 'October: stay on the 30-lb cut path',
+    due: null,
+    month: '2026-10',
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-oct-hm',
+    title: 'October: half-marathon training blocks',
+    due: null,
+    month: '2026-10',
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-oct-family',
+    title: 'October: weekly family night protected',
+    due: null,
+    month: '2026-10',
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+];

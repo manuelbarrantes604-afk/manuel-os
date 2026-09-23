@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CHECK_DEFS,
   DAY_PARTS,
@@ -6,7 +6,12 @@ import {
   IMPROVE_TIPS,
   STREAKS,
 } from './data/seed';
+import WeatherCard from './components/WeatherCard';
+import FollowupsStrip from './components/FollowupsStrip';
+import FollowupsView from './components/FollowupsView';
 import { useCheckins } from './hooks/useCheckins';
+import { useFollowups } from './hooks/useFollowups';
+import { useWeather } from './hooks/useWeather';
 import { useWeight } from './hooks/useWeight';
 import { activePeriodId, formatDayLabel } from './lib/time';
 import { buildWeeklyReport } from './lib/weeklyCoach';
@@ -14,6 +19,7 @@ import './App.css';
 
 const NAV = [
   { id: 'today', label: 'Today', icon: '○' },
+  { id: 'followups', label: 'Follow-ups', icon: '☐' },
   { id: 'progress', label: 'Progress', icon: '◎' },
   { id: 'weekly', label: 'Weekly', icon: '◉' },
 ];
@@ -21,10 +27,12 @@ const NAV = [
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
 
 /*
- * Tab ✓ completion rules (v9):
- * - Today:    day closed OR all morning+night checks graded (no PENDING)
- * - Progress: today’s weight logged (morning weigh-in done)
- * - Weekly:   ≥3 days in the current Mon–Sun week have any Pass/Fail grades
+ * Tab ✓ completion rules (v10):
+ * - Today:      day closed OR all morning+night checks graded (no PENDING)
+ * - Follow-ups: tended if zero overdue (does NOT block Close day)
+ * - Progress:   today’s weight logged (morning weigh-in done)
+ * - Weekly:     ≥3 days in the current Mon–Sun week have any Pass/Fail grades
+ * Weather is NOT a Pass/Fail check. Follow-ups never block Close day.
  */
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
@@ -279,6 +287,10 @@ function TodayView({
   closeDay,
   ny,
   todayKey,
+  weather,
+  followups,
+  onOpenFollowups,
+  onAddFollowup,
 }) {
   const { todayWeight, setTodayWeight } = useWeight(todayKey);
   const activePart = activePeriodId(ny.hour);
@@ -293,6 +305,9 @@ function TodayView({
             <p className="date-line">
               {today?.label || 'Today'} · {today?.week || 'W—'}
             </p>
+            {weather.metaLine ? (
+              <p className="weather-meta">{weather.metaLine}</p>
+            ) : null}
           </div>
           <ScorePill pct={todayPct} />
         </div>
@@ -300,6 +315,28 @@ function TodayView({
           Faith · Health · Discipline · Family · Execution
         </p>
       </header>
+
+      <WeatherCard
+        loc={weather.loc}
+        locId={weather.locId}
+        setLocId={weather.setLocId}
+        data={weather.data}
+        status={weather.status}
+        errorMsg={weather.errorMsg}
+        morningBrief={weather.morningBrief}
+        refresh={weather.refresh}
+      />
+
+      {followups.showStrip && (
+        <FollowupsStrip
+          items={followups.stripItems}
+          todayKey={todayKey}
+          overdueCount={followups.overdueCount}
+          onToggle={followups.toggle}
+          onOpenFollowups={onOpenFollowups}
+          onAdd={onAddFollowup}
+        />
+      )}
 
       {todayStats.showResults && (
         <>
@@ -548,7 +585,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v9</p>
+        <p>Manuel OS · local only · v10</p>
       </footer>
     </div>
   );
@@ -712,7 +749,7 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
       </section>
 
       <footer className="mos-footer">
-        <p>Manuel OS · weekly mirror · v9</p>
+        <p>Manuel OS · weekly mirror · v10</p>
       </footer>
     </div>
   );
@@ -734,21 +771,39 @@ export default function App() {
     closeDay,
   } = useCheckins();
   const { todayWeight } = useWeight(todayKey);
+  const weather = useWeather(ny.hour);
+  const followups = useFollowups(todayKey);
   const [tab, setTab] = useState('today');
+  const [focusComposer, setFocusComposer] = useState(false);
+
+  useEffect(() => {
+    if (tab !== 'followups') setFocusComposer(false);
+  }, [tab]);
 
   /*
    * Tab ✓ rules (see top-of-file comment):
-   * Today    → closed OR all checks graded
-   * Progress → weight logged today
-   * Weekly   → ≥3 days this week have any grades
+   * Today      → closed OR all checks graded
+   * Follow-ups → zero overdue (never blocks Close day)
+   * Progress   → weight logged today
+   * Weekly     → ≥3 days this week have any grades
    */
   const tabDone = {
     today: Boolean(today?.closed) || Boolean(todayStats?.allGraded),
+    followups: followups.tended,
     progress:
       todayWeight !== '' &&
       todayWeight != null &&
       Number.isFinite(Number(todayWeight)),
     weekly: weekDaysWithGrades >= 3,
+  };
+
+  const openFollowups = () => {
+    setFocusComposer(false);
+    setTab('followups');
+  };
+  const addFollowupJump = () => {
+    setTab('followups');
+    setFocusComposer(true);
   };
 
   if (!today) {
@@ -774,6 +829,22 @@ export default function App() {
               closeDay={closeDay}
               ny={ny}
               todayKey={todayKey}
+              weather={weather}
+              followups={followups}
+              onOpenFollowups={openFollowups}
+              onAddFollowup={addFollowupJump}
+            />
+          )}
+          {tab === 'followups' && (
+            <FollowupsView
+              todayKey={todayKey}
+              groups={followups.groups}
+              counts={followups.counts}
+              add={followups.add}
+              toggle={followups.toggle}
+              remove={followups.remove}
+              rename={followups.rename}
+              focusComposer={focusComposer}
             />
           )}
           {tab === 'progress' && (
@@ -798,7 +869,7 @@ export default function App() {
         </main>
       </div>
 
-      <nav className="bottom-nav tabs-3" aria-label="Main">
+      <nav className="bottom-nav tabs-4" aria-label="Main">
         {NAV.map((n) => (
           <button
             key={n.id}
