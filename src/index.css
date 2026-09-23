@@ -1,26 +1,26 @@
 :root {
-  --bg: #f6f7f8;
-  --bg-soft: #eef0f2;
+  --bg: #fafafa;
+  --bg-soft: #f4f4f5;
   --surface: #ffffff;
-  --surface-2: #f3f5f6;
+  --surface-2: #f7f7f8;
   --border: rgba(15, 23, 42, 0.08);
   --border-strong: rgba(15, 23, 42, 0.12);
-  --text: #1a1d21;
-  --text-soft: #3d4450;
-  --muted: #6b7280;
-  --green: #0aad0a;
-  --green-dark: #088a08;
-  --green-soft: rgba(10, 173, 10, 0.12);
-  --amber: #e8a317;
-  --amber-soft: rgba(232, 163, 23, 0.14);
-  --danger: #e11d48;
-  --danger-soft: rgba(225, 29, 72, 0.12);
-  --shadow: 0 4px 16px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --text: #18181b;
+  --text-soft: #3f3f46;
+  --muted: #71717a;
+  --green: #16a34a;
+  --green-dark: #15803d;
+  --green-soft: rgba(22, 163, 74, 0.08);
+  --amber: #ca8a04;
+  --amber-soft: rgba(202, 138, 4, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.08);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
+  --shadow-lg: 0 4px 16px rgba(15, 23, 42, 0.05);
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --radius: 20px;
-  --radius-sm: 14px;
+  --radius: 16px;
+  --radius-sm: 12px;
   color-scheme: light;
   font-family: var(--sans);
   font-synthesis: none;
@@ -57,9 +57,9 @@ button {
 }
 
 a {
-  color: var(--green);
+  color: var(--green-dark);
 }
 
 ::selection {
-  background: rgba(10, 173, 10, 0.22);
+  background: rgba(22, 163, 74, 0.16);
 }

@@ -7,6 +7,7 @@ export const CHECK_ORDER = [
   'leave',
   'exercise',
   'aiHour',
+  'calAi',
   'familyPass',
 ];
 
@@ -85,7 +86,7 @@ export function weekStripFor(dateKey) {
 
 /**
  * Clock-suggested check — Morning vs Night only.
- * wake → leave → exercise → aiHour → familyPass
+ * wake → leave → exercise → aiHour → calAi → familyPass
  */
 export function suggestedCheckId(hour, minute) {
   const mins = hour * 60 + minute;
@@ -93,6 +94,7 @@ export function suggestedCheckId(hour, minute) {
   if (mins < 6 * 60) return 'leave';
   if (mins < 8 * 60) return 'exercise';
   if (mins < 17 * 60) return 'aiHour';
+  if (mins < 20 * 60) return 'calAi';
   return 'familyPass';
 }
 

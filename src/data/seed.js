@@ -1,4 +1,4 @@
-/** Seed data for Manuel OS — sparse Morning + Night (v7) */
+/** Seed data for Manuel OS — sparse Morning + Night (v8) */
 
 import { formatDayLabel, weekLabel } from '../lib/time';
 
@@ -36,11 +36,19 @@ export const CHECK_DEFS = [
     proof: false,
   },
   {
+    id: 'calAi',
+    label: 'Cal AI review',
+    target: 'end of day',
+    dueHour: 20,
+    dueMinute: 0,
+    proof: false,
+  },
+  {
     id: 'familyPass',
     label: 'Family time',
     target: 'evening',
     dueHour: 20,
-    dueMinute: 0,
+    dueMinute: 30,
     proof: false,
   },
 ];
@@ -55,8 +63,8 @@ export const DAY_PARTS = [
   {
     id: 'night',
     title: 'Night',
-    coachLine: 'Log calories. Family time. Close the day.',
-    checkIds: ['familyPass'],
+    coachLine: 'Cal AI review. Family time. Close the day.',
+    checkIds: ['calAi', 'familyPass'],
   },
 ];
 
@@ -76,6 +84,10 @@ export const IMPROVE_TIPS = {
   aiHour: {
     title: '1 hour with AI',
     tip: 'After exercise, protect one focused hour. AI mastery is a calendar block, not a vibe.',
+  },
+  calAi: {
+    title: 'Cal AI review',
+    tip: 'Open Cal AI. Review the day honestly. Pass only if the review happened — no number to type here.',
   },
   familyPass: {
     title: 'Family time',
@@ -144,7 +156,7 @@ const LEGACY_DROP = [
   'caloriesPass',
 ];
 
-/** Remap legacy days → v7 (aiHour + familyPass; drop midday/priorities/sleep/calories-pass). */
+/** Remap legacy days → v8 (calAi Pass/Fail; drop midday/priorities/sleep/calorie-number). */
 export function migrateDay(day) {
   if (!day || !day.checks) return day;
   const next = { ...day, checks: { ...day.checks } };
@@ -183,15 +195,16 @@ export const SEED_DAYS = {
       leave: { status: 'FAIL', time: '—', note: 'Cold-plunge / leave missed' },
       exercise: { status: 'FAIL', time: '—', note: 'No proof submitted' },
       aiHour: { status: 'FAIL', time: '—', note: 'AI hour missed' },
+      calAi: { status: 'FAIL', time: '—', note: 'Cal AI review missed' },
       familyPass: { status: 'PASS', time: '—', note: 'Family time held' },
     },
     review: {
       ran: true,
       title: 'Evening review — Day 1',
-      score: 20,
-      body: 'First day of the stack. Wake, leave, exercise, and AI hour missed. Family time was the only pass. Honesty > comfort.',
+      score: 17,
+      body: 'First day of the stack. Morning stack and Cal AI review missed. Family time was the only pass. Honesty > comfort.',
       wins: ['Stack is live', 'Evening review completed'],
-      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', '1 hour with AI'],
+      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', '1 hour with AI', 'Cal AI review'],
     },
   },
   '2026-09-23': {
@@ -220,6 +233,11 @@ export const SEED_DAYS = {
         time: '—',
         note: 'After exercise',
       },
+      calAi: {
+        status: 'PENDING',
+        time: '—',
+        note: 'End of day review',
+      },
       familyPass: {
         status: 'PENDING',
         time: '—',
@@ -243,7 +261,6 @@ export const STREAKS = [
   { id: 'aiHour', label: 'AI hour', count: 0, unit: 'days' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v7';
+export const STORAGE_KEY = 'manuel-os-v8';
 
 export const WEIGHT_STORAGE_KEY = 'manuel-os-weight-v1';
-export const CALORIES_STORAGE_KEY = 'manuel-os-calories-v1';

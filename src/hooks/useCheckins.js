@@ -19,9 +19,13 @@ function cloneSeed() {
 
 function loadState() {
   try {
-    // Prefer v7; fall back to v6/v5 and migrate
+    // Prefer v8; fall back to v7/v6/v5 and migrate
     let raw = localStorage.getItem(STORAGE_KEY);
     let fromLegacy = false;
+    if (!raw) {
+      raw = localStorage.getItem('manuel-os-v7');
+      fromLegacy = Boolean(raw);
+    }
     if (!raw) {
       raw = localStorage.getItem('manuel-os-v6');
       fromLegacy = Boolean(raw);
@@ -101,7 +105,6 @@ export function useCheckins() {
     return initial;
   });
 
-  // Ensure today exists if date rolls over in a long session
   useEffect(() => {
     setDays((prev) => {
       if (prev[todayKey]) return prev;
@@ -170,7 +173,7 @@ export function useCheckins() {
             title: 'Day closed',
             body:
               stats.failCount === 0
-                ? 'All five non-negotiables locked. Protect tomorrow’s morning.'
+                ? 'All six non-negotiables locked. Protect tomorrow’s morning.'
                 : `${stats.passCount}/${stats.total} passed. Honesty first — close the gaps tomorrow.`,
           },
         },

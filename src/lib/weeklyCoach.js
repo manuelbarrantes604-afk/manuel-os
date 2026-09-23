@@ -1,9 +1,9 @@
-/** Hard weekly truth lines from Pass/Fail + metrics — no flattery. */
+/** Hard weekly truth lines from Pass/Fail + weight — no flattery. */
 
 import { CHECK_DEFS } from '../data/seed';
 
 const MORNING_IDS = ['wake', 'leave', 'exercise', 'aiHour'];
-const NIGHT_IDS = ['familyPass'];
+const NIGHT_IDS = ['calAi', 'familyPass'];
 
 function rate(pass, total) {
   if (!total) return null;
@@ -12,7 +12,7 @@ function rate(pass, total) {
 
 /**
  * @param {Array<{ key: string, checks: object, pct: number|null }>} weekDays
- * @param {{ weights: Record<string, number>, calories: Record<string, number> }} metrics
+ * @param {{ weights: Record<string, number> }} metrics
  */
 export function buildWeeklyReport(weekDays, metrics = {}) {
   const graded = weekDays.filter((d) => d.pct != null);
@@ -57,7 +57,7 @@ export function buildWeeklyReport(weekDays, metrics = {}) {
   const morningRate = rate(morningPasses, morningPasses + morningFails);
   const nightRate = rate(nightPasses, nightPasses + nightFails);
 
-  // Miss / hit patterns
+  // Miss / hit patterns (Cal AI review shows as Pass/Fail rate, not kcal)
   const patterns = [];
   for (const def of CHECK_DEFS) {
     const c = byCheck[def.id];
@@ -102,15 +102,6 @@ export function buildWeeklyReport(weekDays, metrics = {}) {
     };
   }
 
-  const calEntries = Object.entries(metrics.calories || {})
-    .filter(([k, v]) => weekKeys.has(k) && typeof v === 'number')
-    .sort((a, b) => (a[0] < b[0] ? -1 : 1));
-  const calorieSum = calEntries.reduce((a, [, v]) => a + v, 0);
-  const calorieAvg =
-    calEntries.length === 0
-      ? null
-      : Math.round(calorieSum / calEntries.length);
-
   const truths = buildTruths({
     avg,
     gradedCount: graded.length,
@@ -120,8 +111,6 @@ export function buildWeeklyReport(weekDays, metrics = {}) {
     nightFails,
     byCheck,
     weightTrend,
-    calorieAvg,
-    calLogged: calEntries.length,
   });
 
   return {
@@ -133,9 +122,6 @@ export function buildWeeklyReport(weekDays, metrics = {}) {
     morningRate,
     nightRate,
     weightTrend,
-    calorieAvg,
-    calorieSum: calEntries.length ? calorieSum : null,
-    calLogged: calEntries.length,
     truths,
   };
 }
@@ -198,7 +184,7 @@ function buildTruths(ctx) {
     } else if (ctx.weightTrend.delta > 0.5) {
       lines.push({
         theme: 'Health',
-        line: `Weight up ${ctx.weightTrend.delta} lbs this week (${ctx.weightTrend.first} → ${ctx.weightTrend.last}). The 30 lb goal is moving the wrong way. Calories and mornings, not vibes.`,
+        line: `Weight up ${ctx.weightTrend.delta} lbs this week (${ctx.weightTrend.first} → ${ctx.weightTrend.last}). The 30 lb goal is moving the wrong way. Cal AI review and mornings, not vibes.`,
       });
     } else if (ctx.weightTrend.delta < -0.5) {
       lines.push({
@@ -213,19 +199,28 @@ function buildTruths(ctx) {
     });
   }
 
-  if (ctx.calLogged === 0) {
+  if (ctx.byCheck.calAi?.fail >= 2) {
     lines.push({
       theme: 'Health',
-      line: 'Zero calorie totals typed. Cal AI stays in the app — your number still has to land here. Blind eating is not a cut.',
+      line: `Cal AI review failed ${ctx.byCheck.calAi.fail}×. Blind eating is not a cut. Open the app and Pass/Fail the review — no number theater.`,
     });
-  } else if (ctx.calorieAvg != null && ctx.calorieAvg > 2800) {
+  } else if (
+    ctx.byCheck.calAi?.pass === 0 &&
+    ctx.byCheck.calAi?.fail === 0 &&
+    ctx.gradedCount >= 2
+  ) {
     lines.push({
       theme: 'Health',
-      line: `Avg ${ctx.calorieAvg} kcal logged. High for a cut unless you earned it in training. Discipline is the number, not the story.`,
+      line: 'Cal AI review never graded. If you skip the review, the cut is fiction.',
     });
   }
 
-  if (ctx.byCheck.familyPass?.fail >= 1 || (ctx.byCheck.familyPass?.pass === 0 && ctx.byCheck.familyPass?.fail === 0 && ctx.gradedCount >= 2)) {
+  if (
+    ctx.byCheck.familyPass?.fail >= 1 ||
+    (ctx.byCheck.familyPass?.pass === 0 &&
+      ctx.byCheck.familyPass?.fail === 0 &&
+      ctx.gradedCount >= 2)
+  ) {
     lines.push({
       theme: 'Family',
       line: 'Family time weak or missing. Presence does not appear by accident — Pass/Fail it at night or it gets crowded out.',
@@ -245,11 +240,10 @@ function buildTruths(ctx) {
   } else if (ctx.nightRate != null && ctx.nightRate < 50) {
     lines.push({
       theme: 'Faith',
-      line: `Night close at ${ctx.nightRate}%. Skipping family time steals the evening that protects tomorrow's morning.`,
+      line: `Night close at ${ctx.nightRate}%. Skipping Cal AI review or family time steals the evening that protects tomorrow's morning.`,
     });
   }
 
-  // Cap to keep UI tight but keep the hardest ones
   const order = ['Discipline', 'Health', 'Faith', 'Family'];
   lines.sort(
     (a, b) => order.indexOf(a.theme) - order.indexOf(b.theme),

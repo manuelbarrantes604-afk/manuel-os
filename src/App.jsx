@@ -6,7 +6,6 @@ import {
   IMPROVE_TIPS,
   STREAKS,
 } from './data/seed';
-import { useCalories } from './hooks/useCalories';
 import { useCheckins } from './hooks/useCheckins';
 import { useWeight } from './hooks/useWeight';
 import {
@@ -18,9 +17,9 @@ import { buildWeeklyReport } from './lib/weeklyCoach';
 import './App.css';
 
 const NAV = [
-  { id: 'today', label: 'Today', icon: '☀️' },
-  { id: 'progress', label: 'Progress', icon: '📈' },
-  { id: 'weekly', label: 'Weekly', icon: '🪞' },
+  { id: 'today', label: 'Today', icon: '○' },
+  { id: 'progress', label: 'Progress', icon: '◎' },
+  { id: 'weekly', label: 'Weekly', icon: '◉' },
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
@@ -154,7 +153,6 @@ function PeriodCard({
   isActive,
   nextCheckId,
   weightSlot,
-  caloriesSlot,
   footerSlot,
 }) {
   const rows = part.checkIds.map((id) => ({
@@ -183,7 +181,6 @@ function PeriodCard({
       </div>
 
       {weightSlot}
-      {caloriesSlot}
 
       <ul className="check-list">
         {rows.map(({ def, row }) => (
@@ -216,7 +213,7 @@ function DayResultCard({ stats }) {
           <span className="result-score hot">100%</span>
         </div>
         <p className="result-lead">
-          All five non-negotiables locked. Protect tomorrow&apos;s morning.
+          All six non-negotiables locked. Protect tomorrow&apos;s morning.
         </p>
         <p className="result-sub">
           Faith. Health. Discipline. Family. Execution — carried.
@@ -312,7 +309,6 @@ function TodayView({
   todayKey,
 }) {
   const { todayWeight, setTodayWeight } = useWeight(todayKey);
-  const { todayCalories, setTodayCalories } = useCalories(todayKey);
 
   const nextUp = useMemo(
     () => getNextUp(today?.checks || {}, ny.hour, ny.minute),
@@ -335,7 +331,7 @@ function TodayView({
           <ScorePill pct={todayPct} />
         </div>
         <p className="coach-banner">
-          Faith. Health. Discipline. Family. Execution — not intentions.
+          Faith · Health · Discipline · Family · Execution
         </p>
         <NextUpCard
           nextUp={
@@ -374,21 +370,6 @@ function TodayView({
                   max={500}
                   step={0.1}
                   hint="Step on the scale. Log it."
-                />
-              ) : null
-            }
-            caloriesSlot={
-              part.id === 'night' ? (
-                <NumberField
-                  id="calories-night"
-                  label="Total calories eaten"
-                  unit="kcal · from Cal AI"
-                  value={todayCalories}
-                  onChange={setTodayCalories}
-                  min={0}
-                  max={20000}
-                  step={1}
-                  hint="Type the Cal AI total. No Pass/Fail — the number is the log."
                 />
               ) : null
             }
@@ -450,39 +431,6 @@ function WeightTrend({ recent, trend }) {
   );
 }
 
-function CalorieTrend({ recent }) {
-  if (!recent.length) {
-    return (
-      <p className="weight-empty">
-        No calories logged yet. Add the Cal AI total on Today → Night.
-      </p>
-    );
-  }
-  const max = Math.max(...recent.map((r) => r.kcal));
-  const min = Math.min(...recent.map((r) => r.kcal));
-  const span = Math.max(max - min, 1);
-  return (
-    <div className="weight-trend">
-      <ul className="weight-history">
-        {recent.map((r) => {
-          const bar = 20 + ((r.kcal - min) / span) * 48;
-          return (
-            <li key={r.key}>
-              <span className="wh-date">{formatDayLabel(r.key)}</span>
-              <span
-                className="wh-bar cal-bar"
-                style={{ height: `${bar}px` }}
-                title={`${r.kcal} kcal`}
-              />
-              <span className="wh-lbs mono">{r.kcal}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 function ProgressView({
   days,
   weekPcts,
@@ -492,7 +440,6 @@ function ProgressView({
   todayKey,
 }) {
   const { todayWeight, setTodayWeight, recent, trend } = useWeight(todayKey);
-  const { recent: calRecent } = useCalories(todayKey);
 
   const strip = useMemo(
     () =>
@@ -559,14 +506,6 @@ function ProgressView({
           step={0.1}
         />
         <WeightTrend recent={recent} trend={trend} />
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Calories</h2>
-          <span className="card-sub">Night log · kcal from Cal AI</span>
-        </div>
-        <CalorieTrend recent={calRecent} />
       </section>
 
       <section className="card">
@@ -657,7 +596,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v7</p>
+        <p>Manuel OS · local only · v8</p>
       </footer>
     </div>
   );
@@ -665,7 +604,6 @@ function ProgressView({
 
 function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
   const { weights } = useWeight(todayKey);
-  const { calories } = useCalories(todayKey);
 
   const weekDays = useMemo(
     () =>
@@ -685,8 +623,8 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
   );
 
   const report = useMemo(
-    () => buildWeeklyReport(weekDays, { weights, calories }),
-    [weekDays, weights, calories],
+    () => buildWeeklyReport(weekDays, { weights }),
+    [weekDays, weights],
   );
 
   const avgTone =
@@ -778,12 +716,12 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
 
       <section className="card">
         <div className="card-head">
-          <h2>Body metrics</h2>
-          <span className="card-sub">Weight · calories</span>
+          <h2>Weight</h2>
+          <span className="card-sub">This week</span>
         </div>
-        <div className="metric-grid">
+        <div className="metric-grid single">
           <div className="metric-tile">
-            <span className="metric-kicker">Weight</span>
+            <span className="metric-kicker">Trend</span>
             <strong className="mono">
               {report.weightTrend
                 ? report.weightTrend.count === 1
@@ -801,17 +739,6 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
                       ? `Down ${Math.abs(report.weightTrend.delta)} lbs`
                       : `Up ${report.weightTrend.delta} lbs`
                 : 'No logs this week'}
-            </span>
-          </div>
-          <div className="metric-tile">
-            <span className="metric-kicker">Calories</span>
-            <strong className="mono">
-              {report.calorieAvg == null ? '—' : `${report.calorieAvg}`}
-            </strong>
-            <span className="metric-sub">
-              {report.calLogged
-                ? `avg kcal · ${report.calLogged} day${report.calLogged === 1 ? '' : 's'} · sum ${report.calorieSum}`
-                : 'No totals typed'}
             </span>
           </div>
         </div>
@@ -833,7 +760,7 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
       </section>
 
       <footer className="mos-footer">
-        <p>Manuel OS · weekly mirror · v7</p>
+        <p>Manuel OS · weekly mirror · v8</p>
       </footer>
     </div>
   );
