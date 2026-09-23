@@ -21,7 +21,7 @@ const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
 /*
  * Tab ✓ completion rules (v12):
  * - Today:   day closed OR all morning+night checks graded (no PENDING)
- * - Progress: start weight configured (no daily weigh-in)
+ * - Progress: lifetime start weight configured (no daily weigh-in)
  * - Agenda:  tended if zero overdue (does NOT block Close day)
  * Weather is NOT a Pass/Fail check. Agenda never blocks Close day.
  */
@@ -305,128 +305,71 @@ function TodayView({
   );
 }
 
-function WeightGoalCard({ startWeight, currentWeight, setStart, setCurrent, stats }) {
-  if (!stats.configured) {
-    return (
-      <section className="card weight-goal-card">
-        <div className="card-head">
-          <h2>Weight goal</h2>
-          <span className="card-sub">−30 lbs</span>
-        </div>
-        <p className="wg-prompt">Enter your start weight to set the cut.</p>
-        <NumberField
-          id="weight-start"
-          label="Start weight"
-          unit="lbs"
-          value={startWeight ?? ''}
-          onChange={setStart}
-          min={50}
-          max={500}
-          step={0.1}
-          placeholder="e.g. 210"
-        />
-        <p className="wg-deadline muted">Deadline: {stats.deadlineLabel}</p>
-      </section>
-    );
+/** Live −30 cut % from lifetime start + preferred current (week end → week start → stored). */
+function cutBarStats(lifetimeStart, preferredCurrent, cutLbs, deadlineLabel) {
+  if (lifetimeStart == null) {
+    return {
+      configured: false,
+      start: null,
+      current: preferredCurrent,
+      target: null,
+      left: null,
+      pct: null,
+      cutLbs,
+      deadlineLabel,
+    };
   }
-
-  const markerPct =
-    stats.pct == null
-      ? 0
-      : Math.max(0, Math.min(100, stats.pct));
-
-  return (
-    <section className="card weight-goal-card">
-      <div className="card-head">
-        <h2>Weight goal</h2>
-        <span className="card-sub">−{stats.cutLbs} lbs</span>
-      </div>
-
-      <p className="wg-deadline">
-        Deadline: <strong>{stats.deadlineLabel}</strong>
-      </p>
-
-      <div className="wg-fields">
-        <NumberField
-          id="weight-start"
-          label="Start"
-          unit="lbs"
-          value={startWeight ?? ''}
-          onChange={setStart}
-          min={50}
-          max={500}
-          step={0.1}
-        />
-        <NumberField
-          id="weight-current"
-          label="Current"
-          unit="lbs"
-          value={currentWeight ?? ''}
-          onChange={setCurrent}
-          min={50}
-          max={500}
-          step={0.1}
-          placeholder="optional"
-        />
-        <div className="number-field wg-target-field">
-          <label>
-            <span className="nf-label">Target</span>
-            <span className="nf-unit">lbs</span>
-          </label>
-          <div className="wg-target-value mono" aria-label={`Target ${stats.target} lbs`}>
-            {stats.target}
-          </div>
-        </div>
-      </div>
-
-      <div className="wg-track" aria-hidden="true">
-        <div className="wg-track-bar">
-          <div className="wg-track-fill" style={{ width: `${markerPct}%` }} />
-          {stats.current != null && (
-            <span
-              className="wg-track-marker"
-              style={{ left: `${markerPct}%` }}
-              title={`${stats.current} lbs`}
-            />
-          )}
-        </div>
-        <div className="wg-track-labels">
-          <span>{stats.start}</span>
-          <span className="wg-track-mid">
-            {stats.current != null ? stats.current : '—'}
-          </span>
-          <span>{stats.target}</span>
-        </div>
-        <div className="wg-track-captions">
-          <span>Start</span>
-          <span>Current</span>
-          <span>Target</span>
-        </div>
-      </div>
-
-      <div className="wg-stats">
-        <p>
-          {stats.current == null ? (
-            <>Update current when you want — no daily ritual.</>
-          ) : stats.left <= 0 ? (
-            <>
-              <strong>Cut done</strong> · at or under target
-            </>
-          ) : (
-            <>
-              <strong>{stats.left}</strong> lbs left ·{' '}
-              <strong>{stats.pct}%</strong> of {stats.cutLbs}-lb cut
-            </>
-          )}
-        </p>
-      </div>
-    </section>
-  );
+  const target = Math.round((lifetimeStart - cutLbs) * 10) / 10;
+  const current = preferredCurrent;
+  const lost =
+    current == null ? null : Math.round((lifetimeStart - current) * 10) / 10;
+  const left =
+    current == null ? cutLbs : Math.round((current - target) * 10) / 10;
+  const pct =
+    lost == null
+      ? null
+      : Math.max(0, Math.min(100, Math.round((lost / cutLbs) * 100)));
+  return {
+    configured: true,
+    start: lifetimeStart,
+    current,
+    target,
+    left,
+    pct,
+    cutLbs,
+    deadlineLabel,
+  };
 }
 
-function WeekWeightCard({ weekWeight }) {
+function WeekWeightCard({ weekWeight, weight }) {
   const { stats, setWeekStart, setWeekEnd } = weekWeight;
   const { startLbs, endLbs, lost, windowLabel } = stats;
+  const {
+    startWeight,
+    currentWeight,
+    setStart,
+    setCurrent,
+    stats: weightStats,
+  } = weight;
+
+  // Prefer week end → week start → stored current for the −30 bar
+  const preferredCurrent =
+    endLbs != null ? endLbs : startLbs != null ? startLbs : currentWeight;
+
+  const onWeekEnd = (value) => {
+    setWeekEnd(value);
+    // Optionally sync lifetime "current" from week end when set
+    if (startWeight != null && String(value ?? '').trim() !== '') {
+      setCurrent(value);
+    }
+  };
+
+  const cut = cutBarStats(
+    startWeight,
+    preferredCurrent,
+    weightStats.cutLbs,
+    weightStats.deadlineLabel,
+  );
 
   let reductionLine = 'Set end Friday';
   let reductionTone = 'muted';
@@ -445,6 +388,28 @@ function WeekWeightCard({ weekWeight }) {
     reductionLine = 'Set start & end Friday';
   } else if (startLbs == null) {
     reductionLine = 'Set start Friday';
+  }
+
+  const markerPct = cut.pct == null ? 0 : Math.max(0, Math.min(100, cut.pct));
+
+  let cutLine = null;
+  if (!cut.configured) {
+    cutLine = null; // prompt is the compact field
+  } else if (cut.current == null) {
+    cutLine = 'Set end or start Friday for live cut %';
+  } else if (cut.left <= 0) {
+    cutLine = (
+      <>
+        <strong>Cut done</strong> · at or under target
+      </>
+    );
+  } else {
+    cutLine = (
+      <>
+        <strong>{cut.left}</strong> lbs left · <strong>{cut.pct}%</strong> of{' '}
+        {cut.cutLbs}-lb cut
+      </>
+    );
   }
 
   return (
@@ -471,7 +436,7 @@ function WeekWeightCard({ weekWeight }) {
           label="End Friday"
           unit="lbs"
           value={endLbs ?? ''}
-          onChange={setWeekEnd}
+          onChange={onWeekEnd}
           min={50}
           max={500}
           step={0.1}
@@ -479,12 +444,71 @@ function WeekWeightCard({ weekWeight }) {
         />
       </div>
       <p className={`ww-reduction tone-${reductionTone}`}>{reductionLine}</p>
+
+      <div className="ww-cut">
+        <div className="ww-cut-head">
+          <span className="ww-cut-title">−{weightStats.cutLbs} lb cut</span>
+          <span className="ww-cut-deadline muted">{weightStats.deadlineLabel}</span>
+        </div>
+
+        {!cut.configured && (
+          <NumberField
+            id="lifetime-start-weight"
+            label="Start weight (for −30 cut)"
+            unit="lbs"
+            value={startWeight ?? ''}
+            onChange={setStart}
+            min={50}
+            max={500}
+            step={0.1}
+            placeholder="e.g. 210"
+          />
+        )}
+
+        {cut.configured && (
+          <>
+            <div className="wg-track" aria-hidden="true">
+              <div className="wg-track-bar">
+                <div className="wg-track-fill" style={{ width: `${markerPct}%` }} />
+                {cut.current != null && (
+                  <span
+                    className="wg-track-marker"
+                    style={{ left: `${markerPct}%` }}
+                    title={`${cut.current} lbs`}
+                  />
+                )}
+              </div>
+              <div className="wg-track-labels">
+                <span>{cut.start}</span>
+                <span>{cut.target}</span>
+              </div>
+              <div className="wg-track-captions">
+                <span>Start</span>
+                <span>Target</span>
+              </div>
+            </div>
+            <div className="wg-stats">
+              <p>{cutLine}</p>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
 
 function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
-  const { startWeight, currentWeight, setStart, setCurrent, stats } = weight;
+  const { startWeight, currentWeight, stats: weightStats } = weight;
+  const { startLbs, endLbs } = weekWeight.stats;
+
+  const preferredCurrent =
+    endLbs != null ? endLbs : startLbs != null ? startLbs : currentWeight;
+  const cut = cutBarStats(
+    startWeight,
+    preferredCurrent,
+    weightStats.cutLbs,
+    weightStats.deadlineLabel,
+  );
 
   const latestReview = useMemo(() => {
     const keys = Object.keys(days).sort().reverse();
@@ -520,15 +544,7 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
         <p className="honesty-line">{weekHonesty.line}</p>
       </section>
 
-      <WeekWeightCard weekWeight={weekWeight} />
-
-      <WeightGoalCard
-        startWeight={startWeight}
-        currentWeight={currentWeight}
-        setStart={setStart}
-        setCurrent={setCurrent}
-        stats={stats}
-      />
+      <WeekWeightCard weekWeight={weekWeight} weight={weight} />
 
       <section className="card goals-card">
         <div className="card-head">
@@ -538,7 +554,7 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
         <ul className="goal-list">
           {GOALS.map((g) => {
             const pct =
-              g.id === 'lbs' && stats.pct != null ? stats.pct : g.progress;
+              g.id === 'lbs' && cut.pct != null ? cut.pct : g.progress;
             return (
               <li key={g.id} className="goal-row">
                 <div className="goal-copy">
@@ -571,7 +587,7 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v13</p>
+        <p>Manuel OS · local only · v14</p>
       </footer>
     </div>
   );

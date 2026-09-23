@@ -2139,3 +2139,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* —— v14: −30 cut bar under Fri–Fri week weight —— */
+.ww-cut {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ww-cut-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ww-cut-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.ww-cut-deadline {
+  font-size: 0.7rem;
+  text-align: right;
+}
+
+.ww-cut .number-field {
+  margin-bottom: 4px;
+}
+
+.ww-cut .wg-track {
+  margin-top: 2px;
+}
