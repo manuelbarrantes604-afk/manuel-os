@@ -1,17 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { blankDay, CHECK_DEFS, SEED_DAYS, STORAGE_KEY } from '../data/seed';
+import {
+  blankDay,
+  CHECK_DEFS,
+  migrateDay,
+  SEED_DAYS,
+  STORAGE_KEY,
+} from '../data/seed';
 import { getNyParts, weekStripFor } from '../lib/time';
 
 function cloneSeed() {
-  return structuredClone(SEED_DAYS);
+  const seeded = structuredClone(SEED_DAYS);
+  const out = {};
+  for (const [k, v] of Object.entries(seeded)) {
+    out[k] = migrateDay(v);
+  }
+  return out;
 }
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Prefer v6; fall back to v5 and migrate midday → priorities
+    let raw = localStorage.getItem(STORAGE_KEY);
+    let fromLegacy = false;
+    if (!raw) {
+      raw = localStorage.getItem('manuel-os-v5');
+      fromLegacy = Boolean(raw);
+    }
     if (!raw) return cloneSeed();
     const parsed = JSON.parse(raw);
-    return { ...cloneSeed(), ...parsed };
+    const merged = { ...cloneSeed(), ...parsed };
+    const out = {};
+    for (const [k, v] of Object.entries(merged)) {
+      out[k] = migrateDay(v);
+    }
+    if (fromLegacy) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+    }
+    return out;
   } catch {
     return cloneSeed();
   }
@@ -35,7 +60,7 @@ function calcPct(checks) {
   return Math.round((passes / ids.length) * 100);
 }
 
-function calcDayStats(checks) {
+function calcDayStats(checks, closed = false) {
   const ids = CHECK_DEFS.map((c) => c.id);
   const passes = ids.filter((id) => checks[id]?.status === 'PASS');
   const fails = ids.filter((id) => checks[id]?.status === 'FAIL');
@@ -49,6 +74,8 @@ function calcDayStats(checks) {
     failIds: fails,
     pendingIds: pending,
     allGraded,
+    closed: Boolean(closed) || allGraded,
+    showResults: Boolean(closed) || allGraded,
     pct,
     passCount: passes.length,
     failCount: fails.length,
@@ -64,6 +91,8 @@ export function useCheckins() {
     const initial = loadState();
     if (!initial[todayKey]) {
       initial[todayKey] = blankDay(todayKey);
+    } else {
+      initial[todayKey] = migrateDay(initial[todayKey]);
     }
     return initial;
   });
@@ -88,7 +117,7 @@ export function useCheckins() {
   );
 
   const todayStats = useMemo(
-    () => calcDayStats(today?.checks || {}),
+    () => calcDayStats(today?.checks || {}, today?.closed),
     [today],
   );
 
@@ -98,25 +127,53 @@ export function useCheckins() {
       setDays((prev) => {
         const day = prev[todayKey] || blankDay(todayKey);
         const prevRow = day.checks[checkId] || {};
+        const nextChecks = {
+          ...day.checks,
+          [checkId]: {
+            ...prevRow,
+            status,
+            time: nowTime(),
+            note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
+          },
+        };
+        const stats = calcDayStats(nextChecks, day.closed);
         return {
           ...prev,
           [todayKey]: {
             ...day,
-            checks: {
-              ...day.checks,
-              [checkId]: {
-                ...prevRow,
-                status,
-                time: nowTime(),
-                note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
-              },
-            },
+            // Auto-close when every check is graded
+            closed: day.closed || stats.allGraded,
+            checks: nextChecks,
           },
         };
       });
     },
     [todayKey],
   );
+
+  const closeDay = useCallback(() => {
+    setDays((prev) => {
+      const day = prev[todayKey] || blankDay(todayKey);
+      const stats = calcDayStats(day.checks, true);
+      return {
+        ...prev,
+        [todayKey]: {
+          ...day,
+          closed: true,
+          review: {
+            ...day.review,
+            ran: true,
+            score: stats.pct,
+            title: 'Day closed',
+            body:
+              stats.failCount === 0
+                ? 'All six non-negotiables locked. Protect sleep and tomorrow’s morning.'
+                : `${stats.passCount}/${stats.total} passed. Honesty first — close the gaps tomorrow.`,
+          },
+        },
+      };
+    });
+  }, [todayKey]);
 
   const weekStrip = useMemo(() => weekStripFor(todayKey), [todayKey]);
 
@@ -156,6 +213,7 @@ export function useCheckins() {
     weekHonesty,
     ny,
     setStatus,
+    closeDay,
   };
 }
 

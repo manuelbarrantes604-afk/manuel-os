@@ -6,7 +6,7 @@ export const CHECK_ORDER = [
   'wake',
   'leave',
   'exercise',
-  'midday',
+  'priorities',
   'calories',
   'sleep',
 ];
@@ -85,16 +85,16 @@ export function weekStripFor(dateKey) {
 }
 
 /**
- * Clock-suggested check before advancing past graded ones.
- * Before 5:30 → wake; then leave; exercise until noon; midday until 8pm;
+ * Clock-suggested check — Morning vs Night only.
+ * Before 5:30 → wake; leave; exercise until ~8; priorities until 5pm;
  * calories until 8:30; then sleep.
  */
 export function suggestedCheckId(hour, minute) {
   const mins = hour * 60 + minute;
   if (mins < 5 * 60 + 30) return 'wake';
   if (mins < 6 * 60) return 'leave';
-  if (mins < 12 * 60) return 'exercise';
-  if (mins < 20 * 60) return 'midday';
+  if (mins < 8 * 60) return 'exercise';
+  if (mins < 17 * 60) return 'priorities';
   if (mins < 20 * 60 + 30) return 'calories';
   return 'sleep';
 }
@@ -125,9 +125,8 @@ export function getNextUp(checks, hour, minute) {
   return { id: null, closed: true, label: 'Day closed — see result below' };
 }
 
-/** Active day-part for soft card emphasis. */
+/** Active day-part: Morning (< 5pm) or Night. */
 export function activePeriodId(hour) {
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'midday';
+  if (hour < 17) return 'morning';
   return 'night';
 }

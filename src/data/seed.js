@@ -25,23 +25,23 @@ export const CHECK_DEFS = [
     target: '6:00am',
     dueHour: 6,
     dueMinute: 30,
-    proof: true,
+    proof: false,
   },
   {
-    id: 'midday',
-    label: 'Midday priorities',
-    target: '12:00pm',
-    dueHour: 12,
-    dueMinute: 30,
+    id: 'priorities',
+    label: 'Priorities set',
+    target: 'morning',
+    dueHour: 9,
+    dueMinute: 0,
     proof: false,
   },
   {
     id: 'calories',
-    label: 'Cal AI calories',
+    label: 'Calories',
     target: 'evening',
     dueHour: 20,
     dueMinute: 0,
-    proof: true,
+    proof: false,
   },
   {
     id: 'sleep',
@@ -57,14 +57,8 @@ export const DAY_PARTS = [
   {
     id: 'morning',
     title: 'Morning',
-    coachLine: 'Win the morning, win the day. Faith first, then the body.',
-    checkIds: ['wake', 'leave', 'exercise'],
-  },
-  {
-    id: 'midday',
-    title: 'Midday',
-    coachLine: 'Lock three priorities. Protect family time. No drift.',
-    checkIds: ['midday'],
+    coachLine: 'Win the morning. Faith, body, then priorities.',
+    checkIds: ['wake', 'leave', 'exercise', 'priorities'],
   },
   {
     id: 'night',
@@ -77,27 +71,27 @@ export const DAY_PARTS = [
 export const IMPROVE_TIPS = {
   wake: {
     title: 'Wake 5:00',
-    tip: 'Phone out of reach. Reply to the 5am check immediately. Faith first — get vertical before the negotiation starts.',
+    tip: 'Phone out of reach. Get vertical before the negotiation starts. Faith first.',
   },
   leave: {
     title: 'Leave by 5:30',
-    tip: 'Shoes on by 5:25. Confirm leave in chat. Discipline is the clock, not the mood.',
+    tip: 'Shoes on by 5:25. Discipline is the clock, not the mood.',
   },
   exercise: {
     title: 'Exercise 6:00',
-    tip: 'Photo is the proof (in chat). No text-only. Health is earned in the work you do.',
+    tip: 'Move the body on schedule. Health is earned in the work you do.',
   },
-  midday: {
-    title: 'Midday priorities',
-    tip: 'Lock three priorities in writing. Protect family time. Name the work — no drift.',
+  priorities: {
+    title: 'Priorities set',
+    tip: 'Lock three priorities in writing before the day drifts. Name the work.',
   },
   calories: {
-    title: 'Cal AI calories',
-    tip: 'Log before dinner winds down. Fuel logged is honesty. Intentions do not burn calories.',
+    title: 'Calories',
+    tip: 'Log before dinner winds down. Fuel logged is honesty.',
   },
   sleep: {
     title: 'Sleep by 8:30',
-    tip: "Lights out protects tomorrow's morning. Phone down. Win the night so Faith can lead at 5:00.",
+    tip: "Lights out protects tomorrow's morning. Phone down so Faith can lead at 5:00.",
   },
 };
 
@@ -141,16 +135,43 @@ export function blankDay(dateKey) {
     date: dateKey,
     week: weekLabel(dateKey),
     label: formatDayLabel(dateKey),
+    closed: false,
     checks,
     review: {
       ran: false,
       title: 'Evening review',
       score: null,
-      body: 'Review opens when every check is Pass or Fail.',
+      body: 'Review opens when the day is closed.',
       wins: [],
       misses: [],
     },
   };
+}
+
+/** Remap legacy midday check → priorities (v5 → v6). */
+export function migrateDay(day) {
+  if (!day || !day.checks) return day;
+  const next = { ...day, checks: { ...day.checks } };
+  if (next.checks.midday && !next.checks.priorities) {
+    next.checks.priorities = { ...next.checks.midday };
+  }
+  if (next.checks.midday) {
+    delete next.checks.midday;
+  }
+  // Ensure all current check ids exist
+  for (const def of CHECK_DEFS) {
+    if (!next.checks[def.id]) {
+      next.checks[def.id] = {
+        status: 'PENDING',
+        time: '—',
+        note: 'Not graded yet',
+      };
+    }
+  }
+  if (typeof next.closed !== 'boolean') {
+    next.closed = false;
+  }
+  return next;
 }
 
 /** Tue Sep 22 — first day of stack, rough execution */
@@ -159,27 +180,29 @@ export const SEED_DAYS = {
     date: '2026-09-22',
     week: 'W39',
     label: 'Tue Sep 22',
+    closed: true,
     checks: {
       wake: { status: 'FAIL', time: '—', note: 'Missed wake window' },
       leave: { status: 'FAIL', time: '—', note: 'Cold-plunge / leave missed' },
       exercise: { status: 'FAIL', time: '—', note: 'No proof submitted' },
-      midday: { status: 'FAIL', time: '—', note: 'Priorities not locked' },
-      calories: { status: 'FAIL', time: '—', note: 'Screenshot miss' },
+      priorities: { status: 'FAIL', time: '—', note: 'Priorities not locked' },
+      calories: { status: 'FAIL', time: '—', note: 'Log miss' },
       sleep: { status: 'PASS', time: '8:28pm', note: 'Hit lights-out' },
     },
     review: {
       ran: true,
       title: 'Evening review — Day 1',
       score: 17,
-      body: 'First day of the stack. Wake, leave, exercise, midday, and calories all missed. Sleep was the only pass. Honesty > comfort. Tomorrow: fire checks on time and reply.',
+      body: 'First day of the stack. Wake, leave, exercise, priorities, and calories all missed. Sleep was the only pass. Honesty > comfort.',
       wins: ['Stack is live', 'Evening review completed'],
-      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise proof', 'Midday lock', 'Cal AI'],
+      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', 'Priorities', 'Calories'],
     },
   },
   '2026-09-23': {
     date: '2026-09-23',
     week: 'W39',
     label: 'Wed Sep 23',
+    closed: false,
     checks: {
       wake: {
         status: 'FAIL',
@@ -196,15 +219,15 @@ export const SEED_DAYS = {
         time: '6:12am',
         note: 'Proof request ~6:12 — no photo',
       },
-      midday: {
+      priorities: {
         status: 'PENDING',
-        time: '12:41pm',
-        note: 'Check fired ~12:41 — still waiting on your reply',
+        time: '—',
+        note: 'Set Top 3, then Pass/Fail',
       },
       calories: {
         status: 'PENDING',
         time: '—',
-        note: 'Awaiting Cal AI log',
+        note: 'Pass/Fail when logged',
       },
       sleep: {
         status: 'PENDING',
@@ -216,7 +239,7 @@ export const SEED_DAYS = {
       ran: false,
       title: 'Evening review — Day 2',
       score: null,
-      body: 'Review opens after sleep check. Morning stack already needs a reset. Midday fired — reply when priorities are locked.',
+      body: 'Review opens after you close the day. Morning stack already needs a reset.',
       wins: [],
       misses: [],
     },
@@ -229,10 +252,13 @@ export const STREAKS = [
   { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v5';
+export const STORAGE_KEY = 'manuel-os-v6';
 
 export const PRIORITY_PLACEHOLDERS = [
   'Family dinner present',
   'Manuel OS iteration',
   'AI learning block',
 ];
+
+export const WEIGHT_STORAGE_KEY = 'manuel-os-weight-v1';
+export const CALORIES_STORAGE_KEY = 'manuel-os-calories-v1';
