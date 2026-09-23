@@ -1,4 +1,4 @@
-/** Seed data for Manuel OS — W39 2026 + blank-day factory */
+/** Seed data for Manuel OS — sparse Morning + Night (v7) */
 
 import { formatDayLabel, weekLabel } from '../lib/time';
 
@@ -28,27 +28,19 @@ export const CHECK_DEFS = [
     proof: false,
   },
   {
-    id: 'priorities',
-    label: 'Priorities set',
-    target: 'morning',
-    dueHour: 9,
+    id: 'aiHour',
+    label: '1 hour with AI',
+    target: 'after exercise',
+    dueHour: 8,
     dueMinute: 0,
     proof: false,
   },
   {
-    id: 'calories',
-    label: 'Calories',
+    id: 'familyPass',
+    label: 'Family time',
     target: 'evening',
     dueHour: 20,
     dueMinute: 0,
-    proof: false,
-  },
-  {
-    id: 'sleep',
-    label: 'Sleep by',
-    target: '8:30pm',
-    dueHour: 20,
-    dueMinute: 45,
     proof: false,
   },
 ];
@@ -57,14 +49,14 @@ export const DAY_PARTS = [
   {
     id: 'morning',
     title: 'Morning',
-    coachLine: 'Win the morning. Faith, body, then priorities.',
-    checkIds: ['wake', 'leave', 'exercise', 'priorities'],
+    coachLine: 'Wake. Leave. Move. One hour with AI.',
+    checkIds: ['wake', 'leave', 'exercise', 'aiHour'],
   },
   {
     id: 'night',
     title: 'Night',
-    coachLine: 'Close the loop. Fuel logged. Lights out by 8:30.',
-    checkIds: ['calories', 'sleep'],
+    coachLine: 'Log calories. Family time. Close the day.',
+    checkIds: ['familyPass'],
   },
 ];
 
@@ -81,17 +73,13 @@ export const IMPROVE_TIPS = {
     title: 'Exercise 6:00',
     tip: 'Move the body on schedule. Health is earned in the work you do.',
   },
-  priorities: {
-    title: 'Priorities set',
-    tip: 'Lock three priorities in writing before the day drifts. Name the work.',
+  aiHour: {
+    title: '1 hour with AI',
+    tip: 'After exercise, protect one focused hour. AI mastery is a calendar block, not a vibe.',
   },
-  calories: {
-    title: 'Calories',
-    tip: 'Log before dinner winds down. Fuel logged is honesty.',
-  },
-  sleep: {
-    title: 'Sleep by 8:30',
-    tip: "Lights out protects tomorrow's morning. Phone down so Faith can lead at 5:00.",
+  familyPass: {
+    title: 'Family time',
+    tip: 'Be present. Put the phone down. Family does not get the leftovers of your attention.',
   },
 };
 
@@ -148,16 +136,24 @@ export function blankDay(dateKey) {
   };
 }
 
-/** Remap legacy midday check → priorities (v5 → v6). */
+const LEGACY_DROP = [
+  'midday',
+  'priorities',
+  'calories',
+  'sleep',
+  'caloriesPass',
+];
+
+/** Remap legacy days → v7 (aiHour + familyPass; drop midday/priorities/sleep/calories-pass). */
 export function migrateDay(day) {
   if (!day || !day.checks) return day;
   const next = { ...day, checks: { ...day.checks } };
-  if (next.checks.midday && !next.checks.priorities) {
-    next.checks.priorities = { ...next.checks.midday };
+
+  // Drop removed keys
+  for (const id of LEGACY_DROP) {
+    if (next.checks[id]) delete next.checks[id];
   }
-  if (next.checks.midday) {
-    delete next.checks.midday;
-  }
+
   // Ensure all current check ids exist
   for (const def of CHECK_DEFS) {
     if (!next.checks[def.id]) {
@@ -168,6 +164,7 @@ export function migrateDay(day) {
       };
     }
   }
+
   if (typeof next.closed !== 'boolean') {
     next.closed = false;
   }
@@ -185,17 +182,16 @@ export const SEED_DAYS = {
       wake: { status: 'FAIL', time: '—', note: 'Missed wake window' },
       leave: { status: 'FAIL', time: '—', note: 'Cold-plunge / leave missed' },
       exercise: { status: 'FAIL', time: '—', note: 'No proof submitted' },
-      priorities: { status: 'FAIL', time: '—', note: 'Priorities not locked' },
-      calories: { status: 'FAIL', time: '—', note: 'Log miss' },
-      sleep: { status: 'PASS', time: '8:28pm', note: 'Hit lights-out' },
+      aiHour: { status: 'FAIL', time: '—', note: 'AI hour missed' },
+      familyPass: { status: 'PASS', time: '—', note: 'Family time held' },
     },
     review: {
       ran: true,
       title: 'Evening review — Day 1',
-      score: 17,
-      body: 'First day of the stack. Wake, leave, exercise, priorities, and calories all missed. Sleep was the only pass. Honesty > comfort.',
+      score: 20,
+      body: 'First day of the stack. Wake, leave, exercise, and AI hour missed. Family time was the only pass. Honesty > comfort.',
       wins: ['Stack is live', 'Evening review completed'],
-      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', 'Priorities', 'Calories'],
+      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', '1 hour with AI'],
     },
   },
   '2026-09-23': {
@@ -219,20 +215,15 @@ export const SEED_DAYS = {
         time: '6:12am',
         note: 'Proof request ~6:12 — no photo',
       },
-      priorities: {
+      aiHour: {
         status: 'PENDING',
         time: '—',
-        note: 'Set Top 3, then Pass/Fail',
+        note: 'After exercise',
       },
-      calories: {
+      familyPass: {
         status: 'PENDING',
         time: '—',
-        note: 'Pass/Fail when logged',
-      },
-      sleep: {
-        status: 'PENDING',
-        time: '—',
-        note: 'Target 8:30pm',
+        note: 'Evening presence',
       },
     },
     review: {
@@ -249,16 +240,10 @@ export const SEED_DAYS = {
 export const STREAKS = [
   { id: 'wake', label: 'Wake 5:00', count: 0, unit: 'days' },
   { id: 'exercise', label: 'Exercise', count: 0, unit: 'days' },
-  { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
+  { id: 'aiHour', label: 'AI hour', count: 0, unit: 'days' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v6';
-
-export const PRIORITY_PLACEHOLDERS = [
-  'Family dinner present',
-  'Manuel OS iteration',
-  'AI learning block',
-];
+export const STORAGE_KEY = 'manuel-os-v7';
 
 export const WEIGHT_STORAGE_KEY = 'manuel-os-weight-v1';
 export const CALORIES_STORAGE_KEY = 'manuel-os-calories-v1';

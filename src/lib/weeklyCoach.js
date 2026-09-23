@@ -2,8 +2,8 @@
 
 import { CHECK_DEFS } from '../data/seed';
 
-const MORNING_IDS = ['wake', 'leave', 'exercise', 'priorities'];
-const NIGHT_IDS = ['calories', 'sleep'];
+const MORNING_IDS = ['wake', 'leave', 'exercise', 'aiHour'];
+const NIGHT_IDS = ['familyPass'];
 
 function rate(pass, total) {
   if (!total) return null;
@@ -175,12 +175,17 @@ function buildTruths(ctx) {
   if (ctx.morningRate != null && ctx.morningRate < 50) {
     lines.push({
       theme: 'Health',
-      line: `Mornings are the leak (${ctx.morningRate}% pass rate). Wake / leave / exercise failing kills the 30 lb loss and the half marathon. Fix 5:00 before you negotiate dinner.`,
+      line: `Mornings are the leak (${ctx.morningRate}% pass rate). Wake / leave / exercise / AI hour failing kills the 30 lb loss and the half marathon. Fix 5:00 before you negotiate dinner.`,
     });
   } else if (ctx.byCheck.exercise?.fail >= 2) {
     lines.push({
       theme: 'Health',
       line: `Exercise failed ${ctx.byCheck.exercise.fail}×. Fitness and emotional strength are not mood projects — they are calendar projects.`,
+    });
+  } else if (ctx.byCheck.aiHour?.fail >= 2) {
+    lines.push({
+      theme: 'Discipline',
+      line: `AI hour failed ${ctx.byCheck.aiHour.fail}×. Mastery is one protected hour after exercise — not scrolling later.`,
     });
   }
 
@@ -211,7 +216,7 @@ function buildTruths(ctx) {
   if (ctx.calLogged === 0) {
     lines.push({
       theme: 'Health',
-      line: 'Zero calorie totals typed. Cal AI stay in the app — your number still has to land here. Blind eating is not a cut.',
+      line: 'Zero calorie totals typed. Cal AI stays in the app — your number still has to land here. Blind eating is not a cut.',
     });
   } else if (ctx.calorieAvg != null && ctx.calorieAvg > 2800) {
     lines.push({
@@ -220,22 +225,15 @@ function buildTruths(ctx) {
     });
   }
 
-  if (ctx.byCheck.priorities?.fail >= 1 || ctx.byCheck.priorities?.pass === 0) {
+  if (ctx.byCheck.familyPass?.fail >= 1 || (ctx.byCheck.familyPass?.pass === 0 && ctx.byCheck.familyPass?.fail === 0 && ctx.gradedCount >= 2)) {
     lines.push({
       theme: 'Family',
-      line: 'Priorities weak or missing. Family meaningful time does not appear by accident — name it in the Top 3 or it gets crowded out.',
+      line: 'Family time weak or missing. Presence does not appear by accident — Pass/Fail it at night or it gets crowded out.',
     });
-  }
-
-  if (ctx.byCheck.sleep?.fail >= 2) {
+  } else if (ctx.byCheck.familyPass?.fail >= 2) {
     lines.push({
-      theme: 'Faith',
-      line: `Sleep failed ${ctx.byCheck.sleep.fail}×. You cannot lead at 5:00 with a wrecked night. Faith starts with lights out.`,
-    });
-  } else if (ctx.nightRate != null && ctx.nightRate < 50) {
-    lines.push({
-      theme: 'Faith',
-      line: `Night stack at ${ctx.nightRate}%. Closing the day poorly steals tomorrow's prayer-before-performance window.`,
+      theme: 'Family',
+      line: `Family time failed ${ctx.byCheck.familyPass.fail}×. The people at home cannot live on leftovers of your attention.`,
     });
   }
 
@@ -243,6 +241,11 @@ function buildTruths(ctx) {
     lines.push({
       theme: 'Faith',
       line: `Wake failed ${ctx.byCheck.wake.fail}×. The 5:00 alarm is a covenant with yourself — break it and everything downstream softens.`,
+    });
+  } else if (ctx.nightRate != null && ctx.nightRate < 50) {
+    lines.push({
+      theme: 'Faith',
+      line: `Night close at ${ctx.nightRate}%. Skipping family time steals the evening that protects tomorrow's morning.`,
     });
   }
 

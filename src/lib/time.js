@@ -6,9 +6,8 @@ export const CHECK_ORDER = [
   'wake',
   'leave',
   'exercise',
-  'priorities',
-  'calories',
-  'sleep',
+  'aiHour',
+  'familyPass',
 ];
 
 export function getNyParts(date = new Date()) {
@@ -86,17 +85,15 @@ export function weekStripFor(dateKey) {
 
 /**
  * Clock-suggested check — Morning vs Night only.
- * Before 5:30 → wake; leave; exercise until ~8; priorities until 5pm;
- * calories until 8:30; then sleep.
+ * wake → leave → exercise → aiHour → familyPass
  */
 export function suggestedCheckId(hour, minute) {
   const mins = hour * 60 + minute;
   if (mins < 5 * 60 + 30) return 'wake';
   if (mins < 6 * 60) return 'leave';
   if (mins < 8 * 60) return 'exercise';
-  if (mins < 17 * 60) return 'priorities';
-  if (mins < 20 * 60 + 30) return 'calories';
-  return 'sleep';
+  if (mins < 17 * 60) return 'aiHour';
+  return 'familyPass';
 }
 
 export function getNextUp(checks, hour, minute) {

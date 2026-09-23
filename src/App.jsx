@@ -4,12 +4,10 @@ import {
   DAY_PARTS,
   GOALS,
   IMPROVE_TIPS,
-  PRIORITY_PLACEHOLDERS,
   STREAKS,
 } from './data/seed';
 import { useCalories } from './hooks/useCalories';
 import { useCheckins } from './hooks/useCheckins';
-import { usePriorities } from './hooks/usePriorities';
 import { useWeight } from './hooks/useWeight';
 import {
   activePeriodId,
@@ -110,38 +108,6 @@ function NumberField({ id, label, unit, value, onChange, min, max, step, hint })
   );
 }
 
-function MorningPriorities({ priorities, setPriority, showHint }) {
-  return (
-    <div className="morning-priorities">
-      <div className="morning-pri-head">
-        <strong>Top 3 priorities</strong>
-        <span>Auto-saves</span>
-      </div>
-      <ol className="priority-inputs">
-        {priorities.map((value, i) => (
-          <li key={i}>
-            <span className="pri-num">{i + 1}</span>
-            <input
-              type="text"
-              value={value}
-              placeholder={PRIORITY_PLACEHOLDERS[i]}
-              onChange={(e) => setPriority(i, e.target.value)}
-              onBlur={(e) => setPriority(i, e.target.value.trim())}
-              maxLength={80}
-              aria-label={`Priority ${i + 1}`}
-            />
-          </li>
-        ))}
-      </ol>
-      {showHint && (
-        <p className="priority-hint">
-          Optional: lock at least one, then Pass Priorities set.
-        </p>
-      )}
-    </div>
-  );
-}
-
 function CheckRow({ def, row, setStatus, highlight }) {
   const status = row?.status || 'PENDING';
   return (
@@ -188,7 +154,6 @@ function PeriodCard({
   isActive,
   nextCheckId,
   weightSlot,
-  prioritiesSlot,
   caloriesSlot,
   footerSlot,
 }) {
@@ -198,15 +163,6 @@ function PeriodCard({
   }));
   const done = rows.filter((r) => r.row?.status !== 'PENDING').length;
   const total = rows.length;
-
-  const morningCore =
-    part.id === 'morning' ? rows.filter((r) => r.def.id !== 'priorities') : null;
-  const prioritiesRow =
-    part.id === 'morning' ? rows.find((r) => r.def.id === 'priorities') : null;
-  const caloriesRow =
-    part.id === 'night' ? rows.find((r) => r.def.id === 'calories') : null;
-  const sleepRow =
-    part.id === 'night' ? rows.find((r) => r.def.id === 'sleep') : null;
 
   return (
     <article
@@ -227,57 +183,19 @@ function PeriodCard({
       </div>
 
       {weightSlot}
+      {caloriesSlot}
 
-      {part.id === 'morning' && (
-        <>
-          <ul className="check-list">
-            {morningCore.map(({ def, row }) => (
-              <CheckRow
-                key={def.id}
-                def={def}
-                row={row}
-                setStatus={setStatus}
-                highlight={nextCheckId === def.id}
-              />
-            ))}
-          </ul>
-          {prioritiesSlot}
-          {prioritiesRow && (
-            <ul className="check-list priorities-check">
-              <CheckRow
-                def={prioritiesRow.def}
-                row={prioritiesRow.row}
-                setStatus={setStatus}
-                highlight={nextCheckId === prioritiesRow.def.id}
-              />
-            </ul>
-          )}
-        </>
-      )}
-
-      {part.id === 'night' && (
-        <>
-          {caloriesSlot}
-          <ul className="check-list">
-            {caloriesRow && (
-              <CheckRow
-                def={caloriesRow.def}
-                row={caloriesRow.row}
-                setStatus={setStatus}
-                highlight={nextCheckId === caloriesRow.def.id}
-              />
-            )}
-            {sleepRow && (
-              <CheckRow
-                def={sleepRow.def}
-                row={sleepRow.row}
-                setStatus={setStatus}
-                highlight={nextCheckId === sleepRow.def.id}
-              />
-            )}
-          </ul>
-        </>
-      )}
+      <ul className="check-list">
+        {rows.map(({ def, row }) => (
+          <CheckRow
+            key={def.id}
+            def={def}
+            row={row}
+            setStatus={setStatus}
+            highlight={nextCheckId === def.id}
+          />
+        ))}
+      </ul>
 
       {footerSlot}
     </article>
@@ -298,7 +216,7 @@ function DayResultCard({ stats }) {
           <span className="result-score hot">100%</span>
         </div>
         <p className="result-lead">
-          All six non-negotiables locked. Protect sleep and tomorrow&apos;s morning.
+          All five non-negotiables locked. Protect tomorrow&apos;s morning.
         </p>
         <p className="result-sub">
           Faith. Health. Discipline. Family. Execution — carried.
@@ -348,7 +266,7 @@ function ImprovementCard({ stats }) {
     <section className="card improve-card" aria-live="polite">
       <div className="card-head">
         <h2>What to work on</h2>
-        <span className="card-sub">Gaps · Faith · Health · Discipline</span>
+        <span className="card-sub">Gaps · Faith · Health · Family</span>
       </div>
       <p className="improve-lead">
         Day is closed. Fix these for tomorrow — actions, not pep talk.
@@ -393,7 +311,6 @@ function TodayView({
   ny,
   todayKey,
 }) {
-  const { priorities, setPriority, filledCount } = usePriorities(todayKey);
   const { todayWeight, setTodayWeight } = useWeight(todayKey);
   const { todayCalories, setTodayCalories } = useCalories(todayKey);
 
@@ -402,10 +319,6 @@ function TodayView({
     [today, ny.hour, ny.minute],
   );
   const activePart = activePeriodId(ny.hour);
-  const morningPassed = ['wake', 'leave', 'exercise'].every(
-    (id) => today?.checks?.[id]?.status === 'PASS',
-  );
-  const showPriHint = morningPassed && filledCount === 0;
   const dayClosed = Boolean(today?.closed) || todayStats.allGraded;
 
   return (
@@ -464,15 +377,6 @@ function TodayView({
                 />
               ) : null
             }
-            prioritiesSlot={
-              part.id === 'morning' ? (
-                <MorningPriorities
-                  priorities={priorities}
-                  setPriority={setPriority}
-                  showHint={showPriHint}
-                />
-              ) : null
-            }
             caloriesSlot={
               part.id === 'night' ? (
                 <NumberField
@@ -484,7 +388,7 @@ function TodayView({
                   min={0}
                   max={20000}
                   step={1}
-                  hint="Type the Cal AI total. Pass/Fail grades the commitment."
+                  hint="Type the Cal AI total. No Pass/Fail — the number is the log."
                 />
               ) : null
             }
@@ -546,6 +450,39 @@ function WeightTrend({ recent, trend }) {
   );
 }
 
+function CalorieTrend({ recent }) {
+  if (!recent.length) {
+    return (
+      <p className="weight-empty">
+        No calories logged yet. Add the Cal AI total on Today → Night.
+      </p>
+    );
+  }
+  const max = Math.max(...recent.map((r) => r.kcal));
+  const min = Math.min(...recent.map((r) => r.kcal));
+  const span = Math.max(max - min, 1);
+  return (
+    <div className="weight-trend">
+      <ul className="weight-history">
+        {recent.map((r) => {
+          const bar = 20 + ((r.kcal - min) / span) * 48;
+          return (
+            <li key={r.key}>
+              <span className="wh-date">{formatDayLabel(r.key)}</span>
+              <span
+                className="wh-bar cal-bar"
+                style={{ height: `${bar}px` }}
+                title={`${r.kcal} kcal`}
+              />
+              <span className="wh-lbs mono">{r.kcal}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function ProgressView({
   days,
   weekPcts,
@@ -555,6 +492,7 @@ function ProgressView({
   todayKey,
 }) {
   const { todayWeight, setTodayWeight, recent, trend } = useWeight(todayKey);
+  const { recent: calRecent } = useCalories(todayKey);
 
   const strip = useMemo(
     () =>
@@ -621,6 +559,14 @@ function ProgressView({
           step={0.1}
         />
         <WeightTrend recent={recent} trend={trend} />
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2>Calories</h2>
+          <span className="card-sub">Night log · kcal from Cal AI</span>
+        </div>
+        <CalorieTrend recent={calRecent} />
       </section>
 
       <section className="card">
@@ -711,7 +657,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v6</p>
+        <p>Manuel OS · local only · v7</p>
       </footer>
     </div>
   );
@@ -887,7 +833,7 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
       </section>
 
       <footer className="mos-footer">
-        <p>Manuel OS · weekly mirror · v6</p>
+        <p>Manuel OS · weekly mirror · v7</p>
       </footer>
     </div>
   );

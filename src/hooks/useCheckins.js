@@ -19,9 +19,13 @@ function cloneSeed() {
 
 function loadState() {
   try {
-    // Prefer v6; fall back to v5 and migrate midday → priorities
+    // Prefer v7; fall back to v6/v5 and migrate
     let raw = localStorage.getItem(STORAGE_KEY);
     let fromLegacy = false;
+    if (!raw) {
+      raw = localStorage.getItem('manuel-os-v6');
+      fromLegacy = Boolean(raw);
+    }
     if (!raw) {
       raw = localStorage.getItem('manuel-os-v5');
       fromLegacy = Boolean(raw);
@@ -141,7 +145,6 @@ export function useCheckins() {
           ...prev,
           [todayKey]: {
             ...day,
-            // Auto-close when every check is graded
             closed: day.closed || stats.allGraded,
             checks: nextChecks,
           },
@@ -167,7 +170,7 @@ export function useCheckins() {
             title: 'Day closed',
             body:
               stats.failCount === 0
-                ? 'All six non-negotiables locked. Protect sleep and tomorrow’s morning.'
+                ? 'All five non-negotiables locked. Protect tomorrow’s morning.'
                 : `${stats.passCount}/${stats.total} passed. Honesty first — close the gaps tomorrow.`,
           },
         },
