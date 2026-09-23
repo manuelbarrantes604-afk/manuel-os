@@ -522,6 +522,33 @@ function WeeklyAgendaView({
   );
 }
 
+function MonthDayAddRow({ selected, onQuickAdd }) {
+  const [draft, setDraft] = useState('');
+  const parts = formatAgendaDayParts(selected);
+  const submit = (e) => {
+    e?.preventDefault?.();
+    const t = draft.trim();
+    if (!t) return;
+    onQuickAdd?.(t, selected);
+    setDraft('');
+  };
+  return (
+    <form className="ag-month-add" onSubmit={submit}>
+      <input
+        className="ag-month-add-input"
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={`Add to ${parts.weekday}, ${parts.date}…`}
+        aria-label={`Add item for ${parts.label}`}
+      />
+      <button type="submit" className="fu-composer-add ag-plus" aria-label="Add to selected day">
+        +
+      </button>
+    </form>
+  );
+}
+
 function shiftMonth(ym, delta) {
   const [y, m] = ym.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1 + delta, 1, 12));
@@ -543,6 +570,8 @@ function MonthlyAgendaView({
   onDropDue,
   selected,
   setSelected,
+  onPickDate,
+  onQuickAdd,
 }) {
   useEffect(() => {
     if (!selected.startsWith(monthYm)) {
@@ -623,7 +652,11 @@ function MonthlyAgendaView({
               role="gridcell"
               disabled={!c.inMonth}
               className={`ag-cal-cell ${c.inMonth ? '' : 'out'} ${c.today ? 'today' : ''} ${c.selected ? 'selected' : ''} ${draggingId && c.inMonth ? 'ag-drop-ready' : ''}`}
-              onClick={() => c.inMonth && setSelected(c.key)}
+              onClick={() => {
+                if (!c.inMonth) return;
+                setSelected(c.key);
+                onPickDate?.(c.key);
+              }}
               onDragOver={(e) => {
                 if (!draggingId || !c.inMonth) return;
                 e.preventDefault();
@@ -636,6 +669,7 @@ function MonthlyAgendaView({
                 if (id) {
                   onDropDue(id, c.key);
                   setSelected(c.key);
+                  onPickDate?.(c.key);
                 }
                 onDragEnd?.();
               }}
@@ -653,6 +687,7 @@ function MonthlyAgendaView({
           ))}
         </div>
       </div>
+      <p className="ag-cal-hint">Tap a date to add</p>
 
       <section className="card ag-month-day">
         <DayDropZone
@@ -668,6 +703,10 @@ function MonthlyAgendaView({
           onDragEnd={onDragEnd}
           onDropDue={onDropDue}
           emptyLabel="No items this day"
+        />
+        <MonthDayAddRow
+          selected={selected}
+          onQuickAdd={onQuickAdd}
         />
       </section>
 
@@ -825,6 +864,21 @@ export default function AgendaView({
     }
   }, [view, monthSelected]);
 
+  const pickMonthDate = (dateKey) => {
+    setMonthSelected(dateKey);
+    setDueLocal(dateKey);
+    // Focus main composer so tap clearly opens add/edit for that day
+    requestAnimationFrame(() => {
+      titleRef.current?.focus();
+    });
+  };
+
+  const quickAddForDay = (titleText, dateKey) => {
+    const t = String(titleText || '').trim();
+    if (!t || !dateKey) return;
+    add(t, dateKey);
+  };
+
   return (
     <div className="view agenda-view">
       <header className="progress-header">
@@ -945,11 +999,13 @@ export default function AgendaView({
           onDropDue={onDropDue}
           selected={monthSelected}
           setSelected={setMonthSelected}
+          onPickDate={pickMonthDate}
+          onQuickAdd={quickAddForDay}
         />
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · agenda · local · v12</p>
+        <p>Manuel OS · agenda · local · v13</p>
       </footer>
     </div>
   );

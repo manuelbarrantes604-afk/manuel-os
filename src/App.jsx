@@ -6,6 +6,7 @@ import { useCheckins } from './hooks/useCheckins';
 import { useAgenda } from './hooks/useAgenda';
 import { useWeather } from './hooks/useWeather';
 import { useWeight } from './hooks/useWeight';
+import { useWeekWeight } from './hooks/useWeekWeight';
 import { activePeriodId } from './lib/time';
 import './App.css';
 
@@ -423,7 +424,66 @@ function WeightGoalCard({ startWeight, currentWeight, setStart, setCurrent, stat
   );
 }
 
-function ProgressView({ weekHonesty, days, todayKey, weight }) {
+function WeekWeightCard({ weekWeight }) {
+  const { stats, setWeekStart, setWeekEnd } = weekWeight;
+  const { startLbs, endLbs, lost, windowLabel } = stats;
+
+  let reductionLine = 'Set end Friday';
+  let reductionTone = 'muted';
+  if (startLbs != null && endLbs != null && lost != null) {
+    if (lost > 0) {
+      reductionLine = `−${lost.toFixed(1)} lbs this week`;
+      reductionTone = 'hot';
+    } else if (lost < 0) {
+      reductionLine = `+${Math.abs(lost).toFixed(1)} lbs this week`;
+      reductionTone = 'cold';
+    } else {
+      reductionLine = '0.0 lbs this week';
+      reductionTone = 'mid';
+    }
+  } else if (startLbs == null && endLbs == null) {
+    reductionLine = 'Set start & end Friday';
+  } else if (startLbs == null) {
+    reductionLine = 'Set start Friday';
+  }
+
+  return (
+    <section className="card week-weight-card">
+      <div className="card-head">
+        <h2>This week weight</h2>
+        <span className="card-sub">Fri → Fri</span>
+      </div>
+      <p className="ww-window">{windowLabel}</p>
+      <div className="ww-fields">
+        <NumberField
+          id="week-weight-start"
+          label="Start Friday"
+          unit="lbs"
+          value={startLbs ?? ''}
+          onChange={setWeekStart}
+          min={50}
+          max={500}
+          step={0.1}
+          placeholder="—"
+        />
+        <NumberField
+          id="week-weight-end"
+          label="End Friday"
+          unit="lbs"
+          value={endLbs ?? ''}
+          onChange={setWeekEnd}
+          min={50}
+          max={500}
+          step={0.1}
+          placeholder="—"
+        />
+      </div>
+      <p className={`ww-reduction tone-${reductionTone}`}>{reductionLine}</p>
+    </section>
+  );
+}
+
+function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
   const { startWeight, currentWeight, setStart, setCurrent, stats } = weight;
 
   const latestReview = useMemo(() => {
@@ -447,18 +507,10 @@ function ProgressView({ weekHonesty, days, todayKey, weight }) {
     <div className="view progress-view">
       <header className="progress-header">
         <h1>Progress</h1>
-        <p className="date-line">Cut · honesty · north stars</p>
+        <p className="date-line">Honesty · week cut · north stars</p>
       </header>
 
-      <WeightGoalCard
-        startWeight={startWeight}
-        currentWeight={currentWeight}
-        setStart={setStart}
-        setCurrent={setCurrent}
-        stats={stats}
-      />
-
-      <section className="card honesty-card honesty-lite">
+      <section className="card honesty-card">
         <div className="card-head">
           <h2>Week honesty</h2>
           <span className={`honesty-score tone-${honestyTone}`}>
@@ -468,24 +520,39 @@ function ProgressView({ weekHonesty, days, todayKey, weight }) {
         <p className="honesty-line">{weekHonesty.line}</p>
       </section>
 
-      <section className="card goals-lite">
+      <WeekWeightCard weekWeight={weekWeight} />
+
+      <WeightGoalCard
+        startWeight={startWeight}
+        currentWeight={currentWeight}
+        setStart={setStart}
+        setCurrent={setCurrent}
+        stats={stats}
+      />
+
+      <section className="card goals-card">
         <div className="card-head">
           <h2>Goals</h2>
           <span className="card-sub">North stars</span>
         </div>
-        <ul className="goal-list goal-list-lite">
-          {GOALS.map((g) => (
-            <li key={g.id} className="goal-row-lite">
-              <strong>{g.title}</strong>
-              <span>{g.meta}</span>
-            </li>
-          ))}
+        <ul className="goal-list">
+          {GOALS.map((g) => {
+            const pct =
+              g.id === 'lbs' && stats.pct != null ? stats.pct : g.progress;
+            return (
+              <li key={g.id} className="goal-row">
+                <div className="goal-copy">
+                  <strong>{g.title}</strong>
+                  <span>{g.meta}</span>
+                </div>
+                <span className="goal-pct">{pct}%</span>
+                <div className="goal-meter" aria-hidden="true">
+                  <div className="goal-fill" style={{ width: `${pct}%` }} />
+                </div>
+              </li>
+            );
+          })}
         </ul>
-        {stats.configured ? (
-          <p className="goal-weight-note">
-            Weight cut: {stats.start} → {stats.target} lbs · {stats.deadlineLabel}
-          </p>
-        ) : null}
       </section>
 
       {latestReview?.review?.ran && (
@@ -504,7 +571,7 @@ function ProgressView({ weekHonesty, days, todayKey, weight }) {
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v12</p>
+        <p>Manuel OS · local only · v13</p>
       </footer>
     </div>
   );
@@ -523,6 +590,7 @@ export default function App() {
     closeDay,
   } = useCheckins();
   const weight = useWeight();
+  const weekWeight = useWeekWeight(todayKey);
   const weather = useWeather(ny.hour);
   const agenda = useAgenda(todayKey);
   const [tab, setTab] = useState('today');
@@ -569,6 +637,7 @@ export default function App() {
               days={days}
               todayKey={todayKey}
               weight={weight}
+              weekWeight={weekWeight}
             />
           )}
           {tab === 'agenda' && (
