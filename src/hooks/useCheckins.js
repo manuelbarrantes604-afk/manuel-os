@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CHECK_DEFS, SEED_DAYS, STORAGE_KEY, TODAY_KEY } from '../data/seed';
 
-const STATUS_CYCLE = ['PENDING', 'PASS', 'FAIL'];
-
 function cloneSeed() {
   return structuredClone(SEED_DAYS);
 }
@@ -18,12 +16,42 @@ function loadState() {
   }
 }
 
+function nowTime() {
+  return new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Score = (PASS count / total checks) * 100. PENDING do not count as pass. */
 function calcPct(checks) {
   const ids = CHECK_DEFS.map((c) => c.id);
-  const scored = ids.filter((id) => checks[id]?.status !== 'PENDING');
-  if (scored.length === 0) return null;
-  const passes = scored.filter((id) => checks[id].status === 'PASS').length;
+  const passes = ids.filter((id) => checks[id]?.status === 'PASS').length;
+  const anyMarked = ids.some((id) => checks[id]?.status !== 'PENDING');
+  if (!anyMarked) return null;
   return Math.round((passes / ids.length) * 100);
+}
+
+function calcDayStats(checks) {
+  const ids = CHECK_DEFS.map((c) => c.id);
+  const passes = ids.filter((id) => checks[id]?.status === 'PASS');
+  const fails = ids.filter((id) => checks[id]?.status === 'FAIL');
+  const pending = ids.filter(
+    (id) => !checks[id] || checks[id].status === 'PENDING',
+  );
+  const allGraded = pending.length === 0;
+  const pct = Math.round((passes.length / ids.length) * 100);
+  return {
+    passIds: passes,
+    failIds: fails,
+    pendingIds: pending,
+    allGraded,
+    pct,
+    passCount: passes.length,
+    failCount: fails.length,
+    total: ids.length,
+  };
 }
 
 export function useCheckins() {
@@ -40,26 +68,42 @@ export function useCheckins() {
     [today],
   );
 
-  const cycleStatus = useCallback((checkId) => {
+  const todayStats = useMemo(
+    () => calcDayStats(today?.checks || {}),
+    [today],
+  );
+
+  const setStatus = useCallback((checkId, status) => {
+    if (status !== 'PASS' && status !== 'FAIL') return;
     setDays((prev) => {
       const day = prev[TODAY_KEY];
       if (!day) return prev;
-      const current = day.checks[checkId]?.status || 'PENDING';
-      const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
-      const note =
-        next === 'PASS'
-          ? 'Marked pass'
-          : next === 'FAIL'
-            ? 'Marked fail'
-            : 'Reset to pending';
-      const time =
-        next === 'PENDING'
-          ? '—'
-          : new Date().toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            });
+      const prevRow = day.checks[checkId] || {};
+      return {
+        ...prev,
+        [TODAY_KEY]: {
+          ...day,
+          checks: {
+            ...day.checks,
+            [checkId]: {
+              ...prevRow,
+              status,
+              time: nowTime(),
+              note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
+            },
+          },
+        },
+      };
+    });
+  }, []);
+
+  const clearStatus = useCallback((checkId) => {
+    setDays((prev) => {
+      const day = prev[TODAY_KEY];
+      if (!day) return prev;
+      const seedNote =
+        SEED_DAYS[TODAY_KEY]?.checks?.[checkId]?.note || 'Reset to pending';
+      const seedTime = SEED_DAYS[TODAY_KEY]?.checks?.[checkId]?.time || '—';
       return {
         ...prev,
         [TODAY_KEY]: {
@@ -68,9 +112,9 @@ export function useCheckins() {
             ...day.checks,
             [checkId]: {
               ...day.checks[checkId],
-              status: next,
-              time,
-              note,
+              status: 'PENDING',
+              time: seedTime,
+              note: seedNote,
             },
           },
         },
@@ -82,11 +126,6 @@ export function useCheckins() {
     setDays((prev) => {
       const day = prev[TODAY_KEY];
       if (!day) return prev;
-      const time = new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      });
       return {
         ...prev,
         [TODAY_KEY]: {
@@ -96,7 +135,7 @@ export function useCheckins() {
             [checkId]: {
               ...day.checks[checkId],
               status: 'PASS',
-              time,
+              time: nowTime(),
               note: 'Proof received',
             },
           },
@@ -124,11 +163,13 @@ export function useCheckins() {
     days,
     today,
     todayPct,
+    todayStats,
     weekPcts,
-    cycleStatus,
+    setStatus,
+    clearStatus,
     markProof,
     resetToday,
   };
 }
 
-export { calcPct };
+export { calcPct, calcDayStats };

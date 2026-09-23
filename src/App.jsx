@@ -3,6 +3,7 @@ import {
   CHECK_DEFS,
   DAY_PARTS,
   GOALS,
+  IMPROVE_TIPS,
   STREAKS,
   TODAY_KEY,
   WEEK_STRIP,
@@ -16,6 +17,7 @@ const NAV = [
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
+const MORNING_IDS = ['wake', 'leave', 'exercise'];
 
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
@@ -60,28 +62,52 @@ function TodayHeader({ pct, dateLabel }) {
   );
 }
 
-function CheckRow({ def, row, cycleStatus, markProof }) {
+function CheckRow({ def, row, setStatus, clearStatus, markProof }) {
+  const status = row?.status || 'PENDING';
+  const isPending = status === 'PENDING';
+
   return (
-    <li className={`check-row ${statusClass(row.status)}`}>
-      <button
-        type="button"
-        className="status-chip"
-        onClick={() => cycleStatus(def.id)}
-        aria-label={`Cycle ${def.label} status`}
-      >
-        {row.status}
-      </button>
-      <div className="check-body">
+    <li className={`check-row ${statusClass(status)}`}>
+      <div className="check-body full">
         <div className="check-top">
           <strong>{def.label}</strong>
           <span className="target">{def.target}</span>
         </div>
         <div className="check-meta">
-          <span className="mono">{row.time}</span>
-          <span className="note">{row.note}</span>
+          <span className="mono">{row?.time || '—'}</span>
+          <span className="note">{row?.note}</span>
         </div>
       </div>
-      {def.proof && row.status !== 'PASS' && (
+
+      <div className="pf-row">
+        <button
+          type="button"
+          className={`pf-btn pass ${status === 'PASS' ? 'selected' : ''}`}
+          onClick={() => setStatus(def.id, 'PASS')}
+          aria-pressed={status === 'PASS'}
+        >
+          Pass
+        </button>
+        <button
+          type="button"
+          className={`pf-btn fail ${status === 'FAIL' ? 'selected' : ''}`}
+          onClick={() => setStatus(def.id, 'FAIL')}
+          aria-pressed={status === 'FAIL'}
+        >
+          Fail
+        </button>
+        {!isPending && (
+          <button
+            type="button"
+            className="pf-btn reset"
+            onClick={() => clearStatus(def.id)}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {def.proof && status !== 'PASS' && (
         <button
           type="button"
           className="proof-btn"
@@ -94,7 +120,7 @@ function CheckRow({ def, row, cycleStatus, markProof }) {
   );
 }
 
-function PeriodCard({ part, today, cycleStatus, markProof }) {
+function PeriodCard({ part, today, setStatus, clearStatus, markProof }) {
   const rows = part.checkIds.map((id) => ({
     def: CHECK_BY_ID[id],
     row: today.checks[id],
@@ -120,7 +146,8 @@ function PeriodCard({ part, today, cycleStatus, markProof }) {
             key={def.id}
             def={def}
             row={row}
-            cycleStatus={cycleStatus}
+            setStatus={setStatus}
+            clearStatus={clearStatus}
             markProof={markProof}
           />
         ))}
@@ -129,19 +156,127 @@ function PeriodCard({ part, today, cycleStatus, markProof }) {
   );
 }
 
-function TodayView({ today, todayPct, cycleStatus, markProof }) {
+function DayResultCard({ stats }) {
+  if (!stats) return null;
+  const show = stats.allGraded || stats.pct === 100;
+  if (!show) return null;
+
+  const passLabels = stats.passIds.map((id) => CHECK_BY_ID[id].label);
+  const failLabels = stats.failIds.map((id) => CHECK_BY_ID[id].label);
+
+  if (stats.pct === 100) {
+    return (
+      <section className="card day-result win" aria-live="polite">
+        <div className="card-head">
+          <h2>Day complete</h2>
+          <span className="result-score hot">100%</span>
+        </div>
+        <p className="result-lead">
+          All six non-negotiables locked. Protect sleep and tomorrow&apos;s
+          morning.
+        </p>
+        <p className="result-sub">
+          Faith. Health. Discipline. Family. Execution — carried.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="card day-result graded" aria-live="polite">
+      <div className="card-head">
+        <h2>Day result</h2>
+        <span
+          className={`result-score ${stats.pct >= 50 ? 'mid' : 'cold'}`}
+        >
+          {stats.pct}%
+        </span>
+      </div>
+      <p className="result-lead">
+        {stats.passCount}/{stats.total} passed · {stats.failCount} failed.
+        Honesty first — close the gaps tomorrow.
+      </p>
+      {passLabels.length > 0 && (
+        <p className="result-line pass-line">
+          <strong>Passed:</strong> {passLabels.join(', ')}
+        </p>
+      )}
+      {failLabels.length > 0 && (
+        <p className="result-line fail-line">
+          <strong>Failed:</strong> {failLabels.join(', ')}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ImprovementCard({ stats }) {
+  if (!stats || stats.failCount === 0) return null;
+
+  const morningFails = MORNING_IDS.filter((id) =>
+    stats.failIds.includes(id),
+  ).length;
+  const show =
+    stats.failCount >= 1 &&
+    (stats.failCount >= 2 || morningFails >= 1 || stats.allGraded);
+  if (!show && stats.failCount < 1) return null;
+  // Always show when there is at least 1 FAIL (prefer 2+ or morning stack)
+  // Spec: show when at least 1 FAIL (preferably 2+ or morning failed) — we show for any FAIL
+  const tips = stats.failIds
+    .map((id) => IMPROVE_TIPS[id])
+    .filter(Boolean);
+
+  if (!tips.length) return null;
+
+  const multi = stats.failCount >= 2 || morningFails >= 2;
+
+  return (
+    <section className="card improve-card" aria-live="polite">
+      <div className="card-head">
+        <h2>{multi ? "Today's gaps" : 'One fix'}</h2>
+        <span className="card-sub">Actionable · Faith · Health · Discipline</span>
+      </div>
+      {multi && (
+        <p className="improve-lead">
+          Recurring misses need a reset, not a pep talk. Hit the next check on
+          time.
+        </p>
+      )}
+      <ul className="improve-list">
+        {tips.map((t) => (
+          <li key={t.title}>
+            <strong>{t.title}</strong>
+            <span>{t.tip}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function TodayView({
+  today,
+  todayPct,
+  todayStats,
+  setStatus,
+  clearStatus,
+  markProof,
+}) {
   const dateLabel = today?.label || 'Wed Sep 23';
 
   return (
     <div className="view today-view">
       <TodayHeader pct={todayPct} dateLabel={dateLabel} />
+      <DayResultCard stats={todayStats} />
+      <ImprovementCard stats={todayStats} />
       <div className="period-stack">
         {DAY_PARTS.map((part) => (
           <PeriodCard
             key={part.id}
             part={part}
             today={today}
-            cycleStatus={cycleStatus}
+            setStatus={setStatus}
+            clearStatus={clearStatus}
             markProof={markProof}
           />
         ))}
@@ -267,15 +402,24 @@ function ProgressView({ days, weekPcts, todayPct, resetToday }) {
         <button type="button" className="ghost-btn" onClick={resetToday}>
           Reset today
         </button>
-        <p>Manuel OS · local only · v2</p>
+        <p>Manuel OS · local only · v3</p>
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  const { days, today, todayPct, weekPcts, cycleStatus, markProof, resetToday } =
-    useCheckins();
+  const {
+    days,
+    today,
+    todayPct,
+    todayStats,
+    weekPcts,
+    setStatus,
+    clearStatus,
+    markProof,
+    resetToday,
+  } = useCheckins();
   const [tab, setTab] = useState('today');
 
   return (
@@ -286,7 +430,9 @@ export default function App() {
             <TodayView
               today={today}
               todayPct={todayPct}
-              cycleStatus={cycleStatus}
+              todayStats={todayStats}
+              setStatus={setStatus}
+              clearStatus={clearStatus}
               markProof={markProof}
             />
           ) : (

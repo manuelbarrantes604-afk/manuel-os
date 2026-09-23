@@ -581,3 +581,186 @@
     transition: none !important;
   }
 }
+
+/* —— Pass / Fail buttons —— */
+.check-row {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.check-body.full {
+  width: 100%;
+}
+
+.pf-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.pf-btn {
+  appearance: none;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-width: 72px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.pf-btn:active {
+  transform: scale(0.97);
+}
+
+.pf-btn.pass {
+  color: var(--green-dark);
+  border-color: rgba(10, 173, 10, 0.35);
+  background: rgba(10, 173, 10, 0.06);
+}
+
+.pf-btn.pass.selected {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.pf-btn.fail {
+  color: var(--danger);
+  border-color: rgba(225, 29, 72, 0.3);
+  background: rgba(225, 29, 72, 0.05);
+}
+
+.pf-btn.fail.selected {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.pf-btn.reset {
+  color: var(--muted);
+  border-color: var(--border-strong);
+  background: transparent;
+  font-size: 0.75rem;
+  min-width: auto;
+  padding: 10px 12px;
+}
+
+.pf-btn.reset:hover {
+  color: var(--text);
+}
+
+/* Hide legacy status chip if present */
+.status-chip {
+  display: none;
+}
+
+/* —— Day result —— */
+.day-result.win {
+  border-color: rgba(10, 173, 10, 0.35);
+  background: linear-gradient(180deg, rgba(10, 173, 10, 0.1), var(--surface));
+}
+
+.day-result.graded {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+.result-score {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.result-score.hot {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.result-score.mid {
+  background: var(--amber-soft);
+  color: #9a6b00;
+}
+
+.result-score.cold {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.result-lead {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.result-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+.result-line {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.result-line.pass-line strong {
+  color: var(--green-dark);
+}
+
+.result-line.fail-line strong {
+  color: var(--danger);
+}
+
+/* —— Improvement feedback —— */
+.improve-card {
+  border-color: rgba(225, 29, 72, 0.18);
+  background: linear-gradient(180deg, rgba(225, 29, 72, 0.05), var(--surface));
+}
+
+.improve-lead {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.improve-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.improve-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.improve-list strong {
+  font-size: 0.88rem;
+  color: var(--danger);
+}
+
+.improve-list span {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+}

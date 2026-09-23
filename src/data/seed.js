@@ -72,6 +72,34 @@ export const DAY_PARTS = [
   },
 ];
 
+
+export const IMPROVE_TIPS = {
+  wake: {
+    title: 'Wake 5:00',
+    tip: 'Phone out of reach. Reply to the 5am check immediately. Faith first — get vertical before the negotiation starts.',
+  },
+  leave: {
+    title: 'Leave by 5:30',
+    tip: 'Shoes on by 5:25. Confirm leave in chat. Discipline is the clock, not the mood.',
+  },
+  exercise: {
+    title: 'Exercise photo 6:00',
+    tip: 'Photo is the proof. No text-only. Health is earned in the frame you send.',
+  },
+  midday: {
+    title: 'Midday priorities',
+    tip: 'Lock three priorities in writing. Protect family time. Name the work — no drift.',
+  },
+  calories: {
+    title: 'Cal AI screenshot',
+    tip: 'Screenshot before dinner winds down. Fuel logged is honesty. Intentions do not burn calories.',
+  },
+  sleep: {
+    title: 'Sleep by 8:30',
+    tip: 'Lights out protects tomorrow\'s morning. Phone down. Win the night so Faith can lead at 5:00.',
+  },
+};
+
 export const VALUES = [
   {
     id: 'faith',
@@ -185,5 +213,5 @@ export const STREAKS = [
   { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v2';
+export const STORAGE_KEY = 'manuel-os-v3';
 export const TODAY_KEY = '2026-09-23';
