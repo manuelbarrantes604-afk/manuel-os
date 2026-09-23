@@ -8,11 +8,7 @@ import {
 } from './data/seed';
 import { useCheckins } from './hooks/useCheckins';
 import { useWeight } from './hooks/useWeight';
-import {
-  activePeriodId,
-  formatDayLabel,
-  getNextUp,
-} from './lib/time';
+import { activePeriodId, formatDayLabel } from './lib/time';
 import { buildWeeklyReport } from './lib/weeklyCoach';
 import './App.css';
 
@@ -24,6 +20,12 @@ const NAV = [
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
 
+/*
+ * Tab ✓ completion rules (v9):
+ * - Today:    day closed OR all morning+night checks graded (no PENDING)
+ * - Progress: today’s weight logged (morning weigh-in done)
+ * - Weekly:   ≥3 days in the current Mon–Sun week have any Pass/Fail grades
+ */
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
   if (s === 'FAIL') return 'fail';
@@ -36,15 +38,6 @@ function greetingForHour(h) {
   return 'Good evening';
 }
 
-function scrollToCheck(checkId) {
-  const el = document.getElementById(`check-${checkId}`);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('flash-focus');
-    window.setTimeout(() => el.classList.remove('flash-focus'), 1200);
-  }
-}
-
 function ScorePill({ pct }) {
   const tone =
     pct == null ? 'muted' : pct >= 80 ? 'hot' : pct >= 50 ? 'mid' : 'cold';
@@ -55,31 +48,36 @@ function ScorePill({ pct }) {
   );
 }
 
-function NextUpCard({ nextUp }) {
-  if (!nextUp) return null;
-  if (nextUp.closed) {
-    return (
-      <button type="button" className="next-up closed" disabled>
-        <span className="next-up-kicker">Next up</span>
-        <span className="next-up-title">{nextUp.label}</span>
-      </button>
-    );
-  }
-  const def = CHECK_BY_ID[nextUp.id];
+/** Compact weight row: label left, input right (same pattern as checks). */
+function WeightRow({ id, value, onChange }) {
   return (
-    <button
-      type="button"
-      className="next-up"
-      onClick={() => scrollToCheck(nextUp.id)}
-    >
-      <span className="next-up-kicker">Next up</span>
-      <span className="next-up-title">{def?.label || nextUp.id}</span>
-      <span className="next-up-meta">{def?.target} · tap to jump</span>
-    </button>
+    <div className="check-row weight-row">
+      <div className="check-label">
+        <strong>Weight</strong>
+        <span className="target">lbs</span>
+      </div>
+      <input
+        id={id}
+        className="weight-inline"
+        type="number"
+        inputMode="decimal"
+        step={0.1}
+        min={50}
+        max={500}
+        placeholder="—"
+        value={value === '' || value == null ? '' : value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={(e) => {
+          const v = e.target.value.trim();
+          onChange(v === '' ? '' : v);
+        }}
+        aria-label="Weight in lbs"
+      />
+    </div>
   );
 }
 
-function NumberField({ id, label, unit, value, onChange, min, max, step, hint }) {
+function NumberField({ id, label, unit, value, onChange, min, max, step }) {
   return (
     <div className="number-field">
       <label htmlFor={id}>
@@ -102,29 +100,19 @@ function NumberField({ id, label, unit, value, onChange, min, max, step, hint })
         }}
         aria-label={`${label} in ${unit}`}
       />
-      {hint ? <p className="nf-hint">{hint}</p> : null}
     </div>
   );
 }
 
-function CheckRow({ def, row, setStatus, highlight }) {
+/** One horizontal line: label left, Pass | Fail chips right. */
+function CheckRow({ def, row, setStatus }) {
   const status = row?.status || 'PENDING';
   return (
-    <li
-      id={`check-${def.id}`}
-      className={`check-row ${statusClass(status)} ${highlight ? 'is-next' : ''}`}
-    >
-      <div className="check-body full">
-        <div className="check-top">
-          <strong>{def.label}</strong>
-          <span className="target">{def.target}</span>
-        </div>
-        <div className="check-meta">
-          <span className="mono">{row?.time || '—'}</span>
-          <span className="note">{row?.note}</span>
-        </div>
+    <li id={`check-${def.id}`} className={`check-row ${statusClass(status)}`}>
+      <div className="check-label">
+        <strong>{def.label}</strong>
       </div>
-      <div className="pf-row">
+      <div className="pf-row" role="group" aria-label={`${def.label} grade`}>
         <button
           type="button"
           className={`pf-btn pass ${status === 'PASS' ? 'selected' : ''}`}
@@ -151,7 +139,6 @@ function PeriodCard({
   today,
   setStatus,
   isActive,
-  nextCheckId,
   weightSlot,
   footerSlot,
 }) {
@@ -180,19 +167,13 @@ function PeriodCard({
         </span>
       </div>
 
-      {weightSlot}
-
       <ul className="check-list">
         {rows.map(({ def, row }) => (
-          <CheckRow
-            key={def.id}
-            def={def}
-            row={row}
-            setStatus={setStatus}
-            highlight={nextCheckId === def.id}
-          />
+          <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
         ))}
       </ul>
+
+      {weightSlot}
 
       {footerSlot}
     </article>
@@ -212,12 +193,7 @@ function DayResultCard({ stats }) {
           <h2>Day complete</h2>
           <span className="result-score hot">100%</span>
         </div>
-        <p className="result-lead">
-          All six non-negotiables locked. Protect tomorrow&apos;s morning.
-        </p>
-        <p className="result-sub">
-          Faith. Health. Discipline. Family. Execution — carried.
-        </p>
+        <p className="result-lead">All six locked. Protect tomorrow.</p>
       </section>
     );
   }
@@ -233,8 +209,7 @@ function DayResultCard({ stats }) {
       <p className="result-lead">
         {stats.passCount}/{stats.total} passed
         {stats.failCount ? ` · ${stats.failCount} failed` : ''}
-        {stats.pendingIds.length ? ` · ${stats.pendingIds.length} still open` : ''}
-        . Honesty first.
+        {stats.pendingIds.length ? ` · ${stats.pendingIds.length} open` : ''}
       </p>
       {passLabels.length > 0 && (
         <p className="result-line pass-line">
@@ -263,11 +238,8 @@ function ImprovementCard({ stats }) {
     <section className="card improve-card" aria-live="polite">
       <div className="card-head">
         <h2>What to work on</h2>
-        <span className="card-sub">Gaps · Faith · Health · Family</span>
+        <span className="card-sub">Gaps</span>
       </div>
-      <p className="improve-lead">
-        Day is closed. Fix these for tomorrow — actions, not pep talk.
-      </p>
       <ul className="improve-list">
         {tips.map((t) => (
           <li key={t.title}>
@@ -282,7 +254,7 @@ function ImprovementCard({ stats }) {
 
 function CloseDayButton({ todayStats, closed, onClose }) {
   if (closed || todayStats.allGraded) {
-    return <p className="close-day-done">Day closed · results above</p>;
+    return <p className="close-day-done">Day closed</p>;
   }
   const pending = todayStats.pendingIds.length;
   return (
@@ -292,8 +264,8 @@ function CloseDayButton({ todayStats, closed, onClose }) {
       </button>
       <p className="close-day-hint">
         {pending
-          ? `${pending} still pending — closing unlocks score & gaps`
-          : 'Unlock day % and what to work on'}
+          ? `${pending} pending — closing unlocks score`
+          : 'Unlock day % and gaps'}
       </p>
     </div>
   );
@@ -309,13 +281,7 @@ function TodayView({
   todayKey,
 }) {
   const { todayWeight, setTodayWeight } = useWeight(todayKey);
-
-  const nextUp = useMemo(
-    () => getNextUp(today?.checks || {}, ny.hour, ny.minute),
-    [today, ny.hour, ny.minute],
-  );
   const activePart = activePeriodId(ny.hour);
-  const dayClosed = Boolean(today?.closed) || todayStats.allGraded;
 
   return (
     <div className="view today-view">
@@ -333,13 +299,6 @@ function TodayView({
         <p className="coach-banner">
           Faith · Health · Discipline · Family · Execution
         </p>
-        <NextUpCard
-          nextUp={
-            dayClosed
-              ? { id: null, closed: true, label: 'Day closed — see result below' }
-              : nextUp
-          }
-        />
       </header>
 
       {todayStats.showResults && (
@@ -357,19 +316,12 @@ function TodayView({
             today={today}
             setStatus={setStatus}
             isActive={activePart === part.id}
-            nextCheckId={dayClosed || nextUp.closed ? null : nextUp.id}
             weightSlot={
               part.id === 'morning' ? (
-                <NumberField
+                <WeightRow
                   id="weight-morning"
-                  label="Weight"
-                  unit="lbs · morning"
                   value={todayWeight}
                   onChange={setTodayWeight}
-                  min={50}
-                  max={500}
-                  step={0.1}
-                  hint="Step on the scale. Log it."
                 />
               ) : null
             }
@@ -493,7 +445,7 @@ function ProgressView({
       <section className="card">
         <div className="card-head">
           <h2>Weight</h2>
-          <span className="card-sub">Morning habit · lbs</span>
+          <span className="card-sub">Morning · lbs</span>
         </div>
         <NumberField
           id="weight-progress"
@@ -596,7 +548,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v8</p>
+        <p>Manuel OS · local only · v9</p>
       </footer>
     </div>
   );
@@ -760,7 +712,7 @@ function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
       </section>
 
       <footer className="mos-footer">
-        <p>Manuel OS · weekly mirror · v8</p>
+        <p>Manuel OS · weekly mirror · v9</p>
       </footer>
     </div>
   );
@@ -776,11 +728,28 @@ export default function App() {
     weekPcts,
     weekStrip,
     weekHonesty,
+    weekDaysWithGrades,
     ny,
     setStatus,
     closeDay,
   } = useCheckins();
+  const { todayWeight } = useWeight(todayKey);
   const [tab, setTab] = useState('today');
+
+  /*
+   * Tab ✓ rules (see top-of-file comment):
+   * Today    → closed OR all checks graded
+   * Progress → weight logged today
+   * Weekly   → ≥3 days this week have any grades
+   */
+  const tabDone = {
+    today: Boolean(today?.closed) || Boolean(todayStats?.allGraded),
+    progress:
+      todayWeight !== '' &&
+      todayWeight != null &&
+      Number.isFinite(Number(todayWeight)),
+    weekly: weekDaysWithGrades >= 3,
+  };
 
   if (!today) {
     return (
@@ -840,7 +809,15 @@ export default function App() {
             <span className="nav-icon" aria-hidden="true">
               {n.icon}
             </span>
-            <span className="nav-label">{n.label}</span>
+            <span className="nav-label">
+              {n.label}
+              {tabDone[n.id] ? (
+                <span className="nav-check" aria-label="completed">
+                  {' '}
+                  ✓
+                </span>
+              ) : null}
+            </span>
           </button>
         ))}
       </nav>

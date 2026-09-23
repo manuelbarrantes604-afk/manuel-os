@@ -1,11 +1,11 @@
-/** Seed data for Manuel OS — sparse Morning + Night (v8) */
+/** Seed data for Manuel OS — compact Morning + Night (v9) */
 
 import { formatDayLabel, weekLabel } from '../lib/time';
 
 export const CHECK_DEFS = [
   {
     id: 'wake',
-    label: 'Wake',
+    label: 'Wake 5:00',
     target: '5:00am',
     dueHour: 5,
     dueMinute: 15,
@@ -13,7 +13,7 @@ export const CHECK_DEFS = [
   },
   {
     id: 'leave',
-    label: 'Leave by',
+    label: 'Leave 5:30',
     target: '5:30am',
     dueHour: 5,
     dueMinute: 45,
@@ -21,7 +21,7 @@ export const CHECK_DEFS = [
   },
   {
     id: 'exercise',
-    label: 'Exercise',
+    label: 'Exercise 6:00',
     target: '6:00am',
     dueHour: 6,
     dueMinute: 30,
@@ -29,7 +29,7 @@ export const CHECK_DEFS = [
   },
   {
     id: 'aiHour',
-    label: '1 hour with AI',
+    label: '1hr AI',
     target: 'after exercise',
     dueHour: 8,
     dueMinute: 0,
@@ -57,13 +57,13 @@ export const DAY_PARTS = [
   {
     id: 'morning',
     title: 'Morning',
-    coachLine: 'Wake. Leave. Move. One hour with AI.',
+    coachLine: 'Wake · Leave · Move · AI hour',
     checkIds: ['wake', 'leave', 'exercise', 'aiHour'],
   },
   {
     id: 'night',
     title: 'Night',
-    coachLine: 'Cal AI review. Family time. Close the day.',
+    coachLine: 'Cal AI · Family · Close',
     checkIds: ['calAi', 'familyPass'],
   },
 ];
@@ -74,7 +74,7 @@ export const IMPROVE_TIPS = {
     tip: 'Phone out of reach. Get vertical before the negotiation starts. Faith first.',
   },
   leave: {
-    title: 'Leave by 5:30',
+    title: 'Leave 5:30',
     tip: 'Shoes on by 5:25. Discipline is the clock, not the mood.',
   },
   exercise: {
@@ -82,7 +82,7 @@ export const IMPROVE_TIPS = {
     tip: 'Move the body on schedule. Health is earned in the work you do.',
   },
   aiHour: {
-    title: '1 hour with AI',
+    title: '1hr AI',
     tip: 'After exercise, protect one focused hour. AI mastery is a calendar block, not a vibe.',
   },
   calAi: {
@@ -156,17 +156,15 @@ const LEGACY_DROP = [
   'caloriesPass',
 ];
 
-/** Remap legacy days → v8 (calAi Pass/Fail; drop midday/priorities/sleep/calorie-number). */
+/** Remap legacy days → v9 (same checks as v8; drop midday/priorities/sleep/calorie-number). */
 export function migrateDay(day) {
   if (!day || !day.checks) return day;
   const next = { ...day, checks: { ...day.checks } };
 
-  // Drop removed keys
   for (const id of LEGACY_DROP) {
     if (next.checks[id]) delete next.checks[id];
   }
 
-  // Ensure all current check ids exist
   for (const def of CHECK_DEFS) {
     if (!next.checks[def.id]) {
       next.checks[def.id] = {
@@ -204,7 +202,7 @@ export const SEED_DAYS = {
       score: 17,
       body: 'First day of the stack. Morning stack and Cal AI review missed. Family time was the only pass. Honesty > comfort.',
       wins: ['Stack is live', 'Evening review completed'],
-      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', '1 hour with AI', 'Cal AI review'],
+      misses: ['Wake 5:00', 'Leave 5:30', 'Exercise', '1hr AI', 'Cal AI review'],
     },
   },
   '2026-09-23': {
@@ -261,6 +259,6 @@ export const STREAKS = [
   { id: 'aiHour', label: 'AI hour', count: 0, unit: 'days' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v8';
+export const STORAGE_KEY = 'manuel-os-v9';
 
 export const WEIGHT_STORAGE_KEY = 'manuel-os-weight-v1';

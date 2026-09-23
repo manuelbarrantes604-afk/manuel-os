@@ -19,20 +19,22 @@ function cloneSeed() {
 
 function loadState() {
   try {
-    // Prefer v8; fall back to v7/v6/v5 and migrate
+    // Prefer v9; fall back to v8/v7/v6/v5 and migrate
     let raw = localStorage.getItem(STORAGE_KEY);
     let fromLegacy = false;
     if (!raw) {
-      raw = localStorage.getItem('manuel-os-v7');
-      fromLegacy = Boolean(raw);
-    }
-    if (!raw) {
-      raw = localStorage.getItem('manuel-os-v6');
-      fromLegacy = Boolean(raw);
-    }
-    if (!raw) {
-      raw = localStorage.getItem('manuel-os-v5');
-      fromLegacy = Boolean(raw);
+      for (const key of [
+        'manuel-os-v8',
+        'manuel-os-v7',
+        'manuel-os-v6',
+        'manuel-os-v5',
+      ]) {
+        raw = localStorage.getItem(key);
+        if (raw) {
+          fromLegacy = true;
+          break;
+        }
+      }
     }
     if (!raw) return cloneSeed();
     const parsed = JSON.parse(raw);
@@ -89,6 +91,15 @@ function calcDayStats(checks, closed = false) {
     failCount: fails.length,
     total: ids.length,
   };
+}
+
+/** True when a day has at least one Pass/Fail grade (not all PENDING). */
+function dayHasAnyGrade(day) {
+  if (!day?.checks) return false;
+  return CHECK_DEFS.some((d) => {
+    const s = day.checks[d.id]?.status;
+    return s === 'PASS' || s === 'FAIL';
+  });
 }
 
 export function useCheckins() {
@@ -208,6 +219,11 @@ export function useCheckins() {
     return { avg, count: scored.length, line };
   }, [weekStrip, weekPcts]);
 
+  /** Count of week days that have any Pass/Fail grades. */
+  const weekDaysWithGrades = useMemo(() => {
+    return weekStrip.filter((d) => dayHasAnyGrade(days[d.key])).length;
+  }, [weekStrip, days]);
+
   return {
     days,
     today,
@@ -217,10 +233,11 @@ export function useCheckins() {
     weekPcts,
     weekStrip,
     weekHonesty,
+    weekDaysWithGrades,
     ny,
     setStatus,
     closeDay,
   };
 }
 
-export { calcPct, calcDayStats };
+export { calcPct, calcDayStats, dayHasAnyGrade };
