@@ -97,60 +97,6 @@ export function useCheckins() {
     });
   }, []);
 
-  const clearStatus = useCallback((checkId) => {
-    setDays((prev) => {
-      const day = prev[TODAY_KEY];
-      if (!day) return prev;
-      const seedNote =
-        SEED_DAYS[TODAY_KEY]?.checks?.[checkId]?.note || 'Reset to pending';
-      const seedTime = SEED_DAYS[TODAY_KEY]?.checks?.[checkId]?.time || '—';
-      return {
-        ...prev,
-        [TODAY_KEY]: {
-          ...day,
-          checks: {
-            ...day.checks,
-            [checkId]: {
-              ...day.checks[checkId],
-              status: 'PENDING',
-              time: seedTime,
-              note: seedNote,
-            },
-          },
-        },
-      };
-    });
-  }, []);
-
-  const markProof = useCallback((checkId) => {
-    setDays((prev) => {
-      const day = prev[TODAY_KEY];
-      if (!day) return prev;
-      return {
-        ...prev,
-        [TODAY_KEY]: {
-          ...day,
-          checks: {
-            ...day.checks,
-            [checkId]: {
-              ...day.checks[checkId],
-              status: 'PASS',
-              time: nowTime(),
-              note: 'Proof received',
-            },
-          },
-        },
-      };
-    });
-  }, []);
-
-  const resetToday = useCallback(() => {
-    setDays((prev) => ({
-      ...prev,
-      [TODAY_KEY]: structuredClone(SEED_DAYS[TODAY_KEY]),
-    }));
-  }, []);
-
   const weekPcts = useMemo(() => {
     const map = {};
     for (const [key, day] of Object.entries(days)) {
@@ -166,9 +112,6 @@ export function useCheckins() {
     todayStats,
     weekPcts,
     setStatus,
-    clearStatus,
-    markProof,
-    resetToday,
   };
 }
 

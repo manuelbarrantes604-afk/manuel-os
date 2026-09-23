@@ -213,5 +213,5 @@ export const STREAKS = [
   { id: 'sleep', label: 'Sleep 8:30', count: 1, unit: 'day' },
 ];
 
-export const STORAGE_KEY = 'manuel-os-v3';
+export const STORAGE_KEY = 'manuel-os-v4';
 export const TODAY_KEY = '2026-09-23';

@@ -17,7 +17,6 @@ const NAV = [
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
-const MORNING_IDS = ['wake', 'leave', 'exercise'];
 
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
@@ -62,9 +61,8 @@ function TodayHeader({ pct, dateLabel }) {
   );
 }
 
-function CheckRow({ def, row, setStatus, clearStatus, markProof }) {
+function CheckRow({ def, row, setStatus }) {
   const status = row?.status || 'PENDING';
-  const isPending = status === 'PENDING';
 
   return (
     <li className={`check-row ${statusClass(status)}`}>
@@ -96,31 +94,12 @@ function CheckRow({ def, row, setStatus, clearStatus, markProof }) {
         >
           Fail
         </button>
-        {!isPending && (
-          <button
-            type="button"
-            className="pf-btn reset"
-            onClick={() => clearStatus(def.id)}
-          >
-            Reset
-          </button>
-        )}
       </div>
-
-      {def.proof && status !== 'PASS' && (
-        <button
-          type="button"
-          className="proof-btn"
-          onClick={() => markProof(def.id)}
-        >
-          Add proof
-        </button>
-      )}
     </li>
   );
 }
 
-function PeriodCard({ part, today, setStatus, clearStatus, markProof }) {
+function PeriodCard({ part, today, setStatus }) {
   const rows = part.checkIds.map((id) => ({
     def: CHECK_BY_ID[id],
     row: today.checks[id],
@@ -147,8 +126,6 @@ function PeriodCard({ part, today, setStatus, clearStatus, markProof }) {
             def={def}
             row={row}
             setStatus={setStatus}
-            clearStatus={clearStatus}
-            markProof={markProof}
           />
         ))}
       </ul>
@@ -210,38 +187,25 @@ function DayResultCard({ stats }) {
   );
 }
 
+/** Gaps only after the day is fully graded (no PENDING left). */
 function ImprovementCard({ stats }) {
-  if (!stats || stats.failCount === 0) return null;
+  if (!stats || !stats.allGraded || stats.failCount === 0) return null;
 
-  const morningFails = MORNING_IDS.filter((id) =>
-    stats.failIds.includes(id),
-  ).length;
-  const show =
-    stats.failCount >= 1 &&
-    (stats.failCount >= 2 || morningFails >= 1 || stats.allGraded);
-  if (!show && stats.failCount < 1) return null;
-  // Always show when there is at least 1 FAIL (prefer 2+ or morning stack)
-  // Spec: show when at least 1 FAIL (preferably 2+ or morning failed) — we show for any FAIL
   const tips = stats.failIds
     .map((id) => IMPROVE_TIPS[id])
     .filter(Boolean);
 
   if (!tips.length) return null;
 
-  const multi = stats.failCount >= 2 || morningFails >= 2;
-
   return (
     <section className="card improve-card" aria-live="polite">
       <div className="card-head">
-        <h2>{multi ? "Today's gaps" : 'One fix'}</h2>
-        <span className="card-sub">Actionable · Faith · Health · Discipline</span>
+        <h2>Today&apos;s gaps</h2>
+        <span className="card-sub">What to change · Faith · Health · Discipline</span>
       </div>
-      {multi && (
-        <p className="improve-lead">
-          Recurring misses need a reset, not a pep talk. Hit the next check on
-          time.
-        </p>
-      )}
+      <p className="improve-lead">
+        Day is graded. Fix these for tomorrow — specific actions, not pep talk.
+      </p>
       <ul className="improve-list">
         {tips.map((t) => (
           <li key={t.title}>
@@ -254,14 +218,7 @@ function ImprovementCard({ stats }) {
   );
 }
 
-function TodayView({
-  today,
-  todayPct,
-  todayStats,
-  setStatus,
-  clearStatus,
-  markProof,
-}) {
+function TodayView({ today, todayPct, todayStats, setStatus }) {
   const dateLabel = today?.label || 'Wed Sep 23';
 
   return (
@@ -276,8 +233,6 @@ function TodayView({
             part={part}
             today={today}
             setStatus={setStatus}
-            clearStatus={clearStatus}
-            markProof={markProof}
           />
         ))}
       </div>
@@ -285,7 +240,7 @@ function TodayView({
   );
 }
 
-function ProgressView({ days, weekPcts, todayPct, resetToday }) {
+function ProgressView({ days, weekPcts, todayPct }) {
   const strip = useMemo(
     () =>
       WEEK_STRIP.map((d) => ({
@@ -399,27 +354,15 @@ function ProgressView({ days, weekPcts, todayPct, resetToday }) {
       )}
 
       <footer className="mos-footer">
-        <button type="button" className="ghost-btn" onClick={resetToday}>
-          Reset today
-        </button>
-        <p>Manuel OS · local only · v3</p>
+        <p>Manuel OS · local only · v4</p>
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  const {
-    days,
-    today,
-    todayPct,
-    todayStats,
-    weekPcts,
-    setStatus,
-    clearStatus,
-    markProof,
-    resetToday,
-  } = useCheckins();
+  const { days, today, todayPct, todayStats, weekPcts, setStatus } =
+    useCheckins();
   const [tab, setTab] = useState('today');
 
   return (
@@ -432,15 +375,12 @@ export default function App() {
               todayPct={todayPct}
               todayStats={todayStats}
               setStatus={setStatus}
-              clearStatus={clearStatus}
-              markProof={markProof}
             />
           ) : (
             <ProgressView
               days={days}
               weekPcts={weekPcts}
               todayPct={todayPct}
-              resetToday={resetToday}
             />
           )}
         </main>
