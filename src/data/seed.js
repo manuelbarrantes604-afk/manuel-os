@@ -261,4 +261,6 @@ export const STREAKS = [
 
 export const STORAGE_KEY = 'manuel-os-v9';
 
+/** @deprecated daily weigh-in history — Progress now uses weight-goal-v1 */
 export const WEIGHT_STORAGE_KEY = 'manuel-os-weight-v1';
+export const WEIGHT_GOAL_KEY = 'manuel-os-weight-goal-v1';

@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  CHECK_DEFS,
-  DAY_PARTS,
-  GOALS,
-  IMPROVE_TIPS,
-  STREAKS,
-} from './data/seed';
+import { CHECK_DEFS, DAY_PARTS, GOALS, IMPROVE_TIPS } from './data/seed';
 import WeatherCard from './components/WeatherCard';
 import AgendaView from './components/AgendaView';
 import { useCheckins } from './hooks/useCheckins';
 import { useAgenda } from './hooks/useAgenda';
 import { useWeather } from './hooks/useWeather';
 import { useWeight } from './hooks/useWeight';
-import { activePeriodId, formatDayLabel } from './lib/time';
+import { activePeriodId } from './lib/time';
 import './App.css';
 
 const NAV = [
@@ -24,9 +18,9 @@ const NAV = [
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
 
 /*
- * Tab ✓ completion rules (v11):
+ * Tab ✓ completion rules (v12):
  * - Today:   day closed OR all morning+night checks graded (no PENDING)
- * - Progress: today’s weight logged (morning weigh-in done)
+ * - Progress: start weight configured (no daily weigh-in)
  * - Agenda:  tended if zero overdue (does NOT block Close day)
  * Weather is NOT a Pass/Fail check. Agenda never blocks Close day.
  */
@@ -52,36 +46,7 @@ function ScorePill({ pct }) {
   );
 }
 
-/** Compact weight row: label left, input right (same pattern as checks). */
-function WeightRow({ id, value, onChange }) {
-  return (
-    <div className="check-row weight-row">
-      <div className="check-label">
-        <strong>Weight</strong>
-        <span className="target">lbs</span>
-      </div>
-      <input
-        id={id}
-        className="weight-inline"
-        type="number"
-        inputMode="decimal"
-        step={0.1}
-        min={50}
-        max={500}
-        placeholder="—"
-        value={value === '' || value == null ? '' : value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={(e) => {
-          const v = e.target.value.trim();
-          onChange(v === '' ? '' : v);
-        }}
-        aria-label="Weight in lbs"
-      />
-    </div>
-  );
-}
-
-function NumberField({ id, label, unit, value, onChange, min, max, step }) {
+function NumberField({ id, label, unit, value, onChange, min, max, step, placeholder }) {
   return (
     <div className="number-field">
       <label htmlFor={id}>
@@ -95,7 +60,7 @@ function NumberField({ id, label, unit, value, onChange, min, max, step }) {
         step={step ?? 1}
         min={min}
         max={max}
-        placeholder="—"
+        placeholder={placeholder ?? '—'}
         value={value === '' || value == null ? '' : value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={(e) => {
@@ -138,14 +103,7 @@ function CheckRow({ def, row, setStatus }) {
   );
 }
 
-function PeriodCard({
-  part,
-  today,
-  setStatus,
-  isActive,
-  weightSlot,
-  footerSlot,
-}) {
+function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
   const rows = part.checkIds.map((id) => ({
     def: CHECK_BY_ID[id],
     row: today.checks[id],
@@ -176,8 +134,6 @@ function PeriodCard({
           <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
         ))}
       </ul>
-
-      {weightSlot}
 
       {footerSlot}
     </article>
@@ -282,10 +238,8 @@ function TodayView({
   setStatus,
   closeDay,
   ny,
-  todayKey,
   weather,
 }) {
-  const { todayWeight, setTodayWeight } = useWeight(todayKey);
   const activePart = activePeriodId(ny.hour);
 
   return (
@@ -334,15 +288,6 @@ function TodayView({
             today={today}
             setStatus={setStatus}
             isActive={activePart === part.id}
-            weightSlot={
-              part.id === 'morning' ? (
-                <WeightRow
-                  id="weight-morning"
-                  value={todayWeight}
-                  onChange={setTodayWeight}
-                />
-              ) : null
-            }
             footerSlot={
               part.id === 'night' ? (
                 <CloseDayButton
@@ -359,67 +304,127 @@ function TodayView({
   );
 }
 
-function WeightTrend({ recent, trend }) {
-  if (!recent.length) {
+function WeightGoalCard({ startWeight, currentWeight, setStart, setCurrent, stats }) {
+  if (!stats.configured) {
     return (
-      <p className="weight-empty">
-        No weight logged yet. Add it on Today → Morning.
-      </p>
+      <section className="card weight-goal-card">
+        <div className="card-head">
+          <h2>Weight goal</h2>
+          <span className="card-sub">−30 lbs</span>
+        </div>
+        <p className="wg-prompt">Enter your start weight to set the cut.</p>
+        <NumberField
+          id="weight-start"
+          label="Start weight"
+          unit="lbs"
+          value={startWeight ?? ''}
+          onChange={setStart}
+          min={50}
+          max={500}
+          step={0.1}
+          placeholder="e.g. 210"
+        />
+        <p className="wg-deadline muted">Deadline: {stats.deadlineLabel}</p>
+      </section>
     );
   }
-  const max = Math.max(...recent.map((r) => r.lbs));
-  const min = Math.min(...recent.map((r) => r.lbs));
-  const span = Math.max(max - min, 1);
+
+  const markerPct =
+    stats.pct == null
+      ? 0
+      : Math.max(0, Math.min(100, stats.pct));
+
   return (
-    <div className="weight-trend">
-      {trend && (
-        <p className="weight-delta">
-          {trend.delta === 0
-            ? 'Flat across recent entries'
-            : trend.delta < 0
-              ? `Down ${Math.abs(trend.delta)} lbs across ${trend.days} entries`
-              : `Up ${trend.delta} lbs across ${trend.days} entries`}
+    <section className="card weight-goal-card">
+      <div className="card-head">
+        <h2>Weight goal</h2>
+        <span className="card-sub">−{stats.cutLbs} lbs</span>
+      </div>
+
+      <p className="wg-deadline">
+        Deadline: <strong>{stats.deadlineLabel}</strong>
+      </p>
+
+      <div className="wg-fields">
+        <NumberField
+          id="weight-start"
+          label="Start"
+          unit="lbs"
+          value={startWeight ?? ''}
+          onChange={setStart}
+          min={50}
+          max={500}
+          step={0.1}
+        />
+        <NumberField
+          id="weight-current"
+          label="Current"
+          unit="lbs"
+          value={currentWeight ?? ''}
+          onChange={setCurrent}
+          min={50}
+          max={500}
+          step={0.1}
+          placeholder="optional"
+        />
+        <div className="number-field wg-target-field">
+          <label>
+            <span className="nf-label">Target</span>
+            <span className="nf-unit">lbs</span>
+          </label>
+          <div className="wg-target-value mono" aria-label={`Target ${stats.target} lbs`}>
+            {stats.target}
+          </div>
+        </div>
+      </div>
+
+      <div className="wg-track" aria-hidden="true">
+        <div className="wg-track-bar">
+          <div className="wg-track-fill" style={{ width: `${markerPct}%` }} />
+          {stats.current != null && (
+            <span
+              className="wg-track-marker"
+              style={{ left: `${markerPct}%` }}
+              title={`${stats.current} lbs`}
+            />
+          )}
+        </div>
+        <div className="wg-track-labels">
+          <span>{stats.start}</span>
+          <span className="wg-track-mid">
+            {stats.current != null ? stats.current : '—'}
+          </span>
+          <span>{stats.target}</span>
+        </div>
+        <div className="wg-track-captions">
+          <span>Start</span>
+          <span>Current</span>
+          <span>Target</span>
+        </div>
+      </div>
+
+      <div className="wg-stats">
+        <p>
+          {stats.current == null ? (
+            <>Update current when you want — no daily ritual.</>
+          ) : stats.left <= 0 ? (
+            <>
+              <strong>Cut done</strong> · at or under target
+            </>
+          ) : (
+            <>
+              <strong>{stats.left}</strong> lbs left ·{' '}
+              <strong>{stats.pct}%</strong> of {stats.cutLbs}-lb cut
+            </>
+          )}
         </p>
-      )}
-      <ul className="weight-history">
-        {recent.map((r) => {
-          const bar = 20 + ((r.lbs - min) / span) * 48;
-          return (
-            <li key={r.key}>
-              <span className="wh-date">{formatDayLabel(r.key)}</span>
-              <span
-                className="wh-bar"
-                style={{ height: `${bar}px` }}
-                title={`${r.lbs} lbs`}
-              />
-              <span className="wh-lbs mono">{r.lbs}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+      </div>
+    </section>
   );
 }
 
-function ProgressView({
-  days,
-  weekPcts,
-  todayPct,
-  weekStrip,
-  weekHonesty,
-  todayKey,
-}) {
-  const { todayWeight, setTodayWeight, recent, trend } = useWeight(todayKey);
-
-  const strip = useMemo(
-    () =>
-      weekStrip.map((d) => {
-        const pct = d.key === todayKey ? todayPct : weekPcts[d.key] ?? d.pct;
-        const empty = pct == null && !d.today && !days[d.key];
-        return { ...d, pct, empty };
-      }),
-    [weekStrip, weekPcts, todayPct, todayKey, days],
-  );
+function ProgressView({ weekHonesty, days, todayKey, weight }) {
+  const { startWeight, currentWeight, setStart, setCurrent, stats } = weight;
 
   const latestReview = useMemo(() => {
     const keys = Object.keys(days).sort().reverse();
@@ -442,123 +447,56 @@ function ProgressView({
     <div className="view progress-view">
       <header className="progress-header">
         <h1>Progress</h1>
-        <p className="date-line">This week · keep the streak honest</p>
+        <p className="date-line">Cut · honesty · north stars</p>
       </header>
 
-      <section className="card honesty-card">
+      <WeightGoalCard
+        startWeight={startWeight}
+        currentWeight={currentWeight}
+        setStart={setStart}
+        setCurrent={setCurrent}
+        stats={stats}
+      />
+
+      <section className="card honesty-card honesty-lite">
         <div className="card-head">
           <h2>Week honesty</h2>
-          <span className="card-sub">
-            {weekHonesty.count
-              ? `${weekHonesty.count} graded day${weekHonesty.count === 1 ? '' : 's'}`
-              : 'No graded days'}
+          <span className={`honesty-score tone-${honestyTone}`}>
+            {weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`}
           </span>
-        </div>
-        <div className={`honesty-score tone-${honestyTone}`}>
-          {weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`}
         </div>
         <p className="honesty-line">{weekHonesty.line}</p>
       </section>
 
-      <section className="card">
-        <div className="card-head">
-          <h2>Weight</h2>
-          <span className="card-sub">Morning · lbs</span>
-        </div>
-        <NumberField
-          id="weight-progress"
-          label="Today"
-          unit="lbs"
-          value={todayWeight}
-          onChange={setTodayWeight}
-          min={50}
-          max={500}
-          step={0.1}
-        />
-        <WeightTrend recent={recent} trend={trend} />
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>This week</h2>
-          <span className="card-sub">Mon–Sun</span>
-        </div>
-        <div className="week-strip" role="list">
-          {strip.map((d) => (
-            <div
-              key={d.key}
-              className={`day-cell ${d.today ? 'today' : ''} ${d.empty ? 'empty' : ''}`}
-              role="listitem"
-            >
-              <span className="dow">{d.dow}</span>
-              <span className="day-pct">
-                {d.empty && !d.today ? '·' : d.pct == null ? '—' : `${d.pct}%`}
-              </span>
-              <span
-                className={`day-bar ${
-                  d.pct == null
-                    ? 'none'
-                    : d.pct >= 80
-                      ? 'hot'
-                      : d.pct >= 50
-                        ? 'mid'
-                        : 'cold'
-                }`}
-                style={{
-                  height: d.pct == null ? 4 : Math.max(8, (d.pct / 100) * 48),
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Streaks</h2>
-          <span className="card-sub">Current runs</span>
-        </div>
-        <div className="streak-counters">
-          {STREAKS.map((s) => (
-            <div key={s.id} className="streak-card">
-              <span className="streak-count">{s.count}</span>
-              <span className="streak-label">{s.label}</span>
-              <span className="streak-unit">{s.unit}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
+      <section className="card goals-lite">
         <div className="card-head">
           <h2>Goals</h2>
           <span className="card-sub">North stars</span>
         </div>
-        <ul className="goal-list">
+        <ul className="goal-list goal-list-lite">
           {GOALS.map((g) => (
-            <li key={g.id} className="goal-row">
-              <div className="goal-copy">
-                <strong>{g.title}</strong>
-                <span>{g.meta}</span>
-              </div>
-              <span className="goal-pct mono">{g.progress}%</span>
-              <div className="goal-meter" aria-label={`${g.progress}%`}>
-                <div className="goal-fill" style={{ width: `${g.progress}%` }} />
-              </div>
+            <li key={g.id} className="goal-row-lite">
+              <strong>{g.title}</strong>
+              <span>{g.meta}</span>
             </li>
           ))}
         </ul>
+        {stats.configured ? (
+          <p className="goal-weight-note">
+            Weight cut: {stats.start} → {stats.target} lbs · {stats.deadlineLabel}
+          </p>
+        ) : null}
       </section>
 
-      {latestReview?.review && (
+      {latestReview?.review?.ran && (
         <section className="card review-simple">
           <div className="card-head">
             <h2>Latest review</h2>
             <span className="card-sub">
               {latestReview.label}
-              {latestReview.review.ran
-                ? ` · ${latestReview.review.score ?? '—'}%`
-                : ' · open'}
+              {latestReview.review.score != null
+                ? ` · ${latestReview.review.score}%`
+                : ''}
             </span>
           </div>
           <p className="review-body">{latestReview.review.body}</p>
@@ -566,7 +504,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v11</p>
+        <p>Manuel OS · local only · v12</p>
       </footer>
     </div>
   );
@@ -579,14 +517,12 @@ export default function App() {
     todayKey,
     todayPct,
     todayStats,
-    weekPcts,
-    weekStrip,
     weekHonesty,
     ny,
     setStatus,
     closeDay,
   } = useCheckins();
-  const { todayWeight } = useWeight(todayKey);
+  const weight = useWeight();
   const weather = useWeather(ny.hour);
   const agenda = useAgenda(todayKey);
   const [tab, setTab] = useState('today');
@@ -596,18 +532,9 @@ export default function App() {
     if (tab !== 'agenda') setFocusComposer(false);
   }, [tab]);
 
-  /*
-   * Tab ✓ rules (see top-of-file comment):
-   * Today    → closed OR all checks graded
-   * Progress → weight logged today
-   * Agenda   → zero overdue (never blocks Close day)
-   */
   const tabDone = {
     today: Boolean(today?.closed) || Boolean(todayStats?.allGraded),
-    progress:
-      todayWeight !== '' &&
-      todayWeight != null &&
-      Number.isFinite(Number(todayWeight)),
+    progress: Boolean(weight.stats.configured),
     agenda: agenda.tended,
   };
 
@@ -633,18 +560,15 @@ export default function App() {
               setStatus={setStatus}
               closeDay={closeDay}
               ny={ny}
-              todayKey={todayKey}
               weather={weather}
             />
           )}
           {tab === 'progress' && (
             <ProgressView
-              days={days}
-              weekPcts={weekPcts}
-              todayPct={todayPct}
-              weekStrip={weekStrip}
               weekHonesty={weekHonesty}
+              days={days}
               todayKey={todayKey}
+              weight={weight}
             />
           )}
           {tab === 'agenda' && (
@@ -659,6 +583,7 @@ export default function App() {
               toggle={agenda.toggle}
               remove={agenda.remove}
               rename={agenda.rename}
+              setDue={agenda.setDue}
               focusComposer={focusComposer}
             />
           )}

@@ -1,68 +1,105 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { WEIGHT_STORAGE_KEY } from '../data/seed';
 
-function loadWeights() {
+/** Simple start/current goal — no daily weigh-in history. */
+export const WEIGHT_GOAL_KEY = 'manuel-os-weight-goal-v1';
+const CUT_LBS = 30;
+const DEADLINE_LABEL = 'by week of Jan 5, 2027';
+
+function parseLbs(value) {
+  const trimmed = String(value ?? '').trim();
+  if (trimmed === '') return null;
+  const num = Number(trimmed);
+  if (!Number.isFinite(num) || num <= 0 || num > 1000) return null;
+  return Math.round(num * 10) / 10;
+}
+
+function loadGoal() {
   try {
-    const raw = localStorage.getItem(WEIGHT_STORAGE_KEY);
-    if (!raw) return {};
+    const raw = localStorage.getItem(WEIGHT_GOAL_KEY);
+    if (!raw) return { start: null, current: null };
     const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed ? parsed : {};
+    if (!parsed || typeof parsed !== 'object') {
+      return { start: null, current: null };
+    }
+    return {
+      start: parseLbs(parsed.start),
+      current: parseLbs(parsed.current),
+    };
   } catch {
-    return {};
+    return { start: null, current: null };
   }
 }
 
-export function useWeight(dateKey) {
-  const [weights, setWeights] = useState(loadWeights);
+export function useWeight() {
+  const [goal, setGoal] = useState(loadGoal);
 
   useEffect(() => {
-    localStorage.setItem(WEIGHT_STORAGE_KEY, JSON.stringify(weights));
-  }, [weights]);
+    try {
+      localStorage.setItem(WEIGHT_GOAL_KEY, JSON.stringify(goal));
+    } catch {
+      /* ignore */
+    }
+  }, [goal]);
 
-  const todayWeight = weights[dateKey] ?? '';
+  const setStart = useCallback((value) => {
+    setGoal((prev) => {
+      const start = parseLbs(value);
+      // Clearing start also clears current so we never invent numbers
+      if (start == null) return { start: null, current: null };
+      return { ...prev, start };
+    });
+  }, []);
 
-  const setTodayWeight = useCallback(
-    (value) => {
-      setWeights((prev) => {
-        const next = { ...prev };
-        const trimmed = String(value).trim();
-        if (trimmed === '') {
-          delete next[dateKey];
-        } else {
-          const num = Number(trimmed);
-          if (!Number.isFinite(num) || num <= 0 || num > 1000) {
-            return prev;
-          }
-          // Store as number, keep one decimal if needed
-          next[dateKey] = Math.round(num * 10) / 10;
-        }
-        return next;
-      });
-    },
-    [dateKey],
-  );
+  const setCurrent = useCallback((value) => {
+    setGoal((prev) => {
+      if (prev.start == null) return prev;
+      return { ...prev, current: parseLbs(value) };
+    });
+  }, []);
 
-  const recent = useMemo(() => {
-    return Object.entries(weights)
-      .filter(([, v]) => typeof v === 'number' && Number.isFinite(v))
-      .map(([key, lbs]) => ({ key, lbs }))
-      .sort((a, b) => (a.key < b.key ? 1 : -1))
-      .slice(0, 14);
-  }, [weights]);
-
-  const trend = useMemo(() => {
-    if (recent.length < 2) return null;
-    const newest = recent[0].lbs;
-    const oldest = recent[recent.length - 1].lbs;
-    const delta = Math.round((newest - oldest) * 10) / 10;
-    return { delta, newest, oldest, days: recent.length };
-  }, [recent]);
+  const stats = useMemo(() => {
+    const start = goal.start;
+    if (start == null) {
+      return {
+        start: null,
+        current: null,
+        target: null,
+        lost: null,
+        left: null,
+        pct: null,
+        cutLbs: CUT_LBS,
+        deadlineLabel: DEADLINE_LABEL,
+        configured: false,
+      };
+    }
+    const target = Math.round((start - CUT_LBS) * 10) / 10;
+    const current = goal.current;
+    const lost =
+      current == null ? null : Math.round((start - current) * 10) / 10;
+    const left =
+      current == null ? CUT_LBS : Math.round((current - target) * 10) / 10;
+    const pct =
+      lost == null
+        ? null
+        : Math.max(0, Math.min(100, Math.round((lost / CUT_LBS) * 100)));
+    return {
+      start,
+      current,
+      target,
+      lost,
+      left,
+      pct,
+      cutLbs: CUT_LBS,
+      deadlineLabel: DEADLINE_LABEL,
+      configured: true,
+    };
+  }, [goal]);
 
   return {
-    todayWeight,
-    setTodayWeight,
-    recent,
-    trend,
-    weights,
+    startWeight: goal.start,
+    currentWeight: goal.current,
+    setStart,
+    setCurrent,
+    stats,
   };
 }

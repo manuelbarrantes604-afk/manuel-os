@@ -7,18 +7,18 @@ const CACHE_MS = 30 * 60 * 1000;
 
 export const WEATHER_LOCS = [
   {
-    id: 'bentonville',
-    label: 'Bentonville',
-    short: 'Bentonville, AR',
-    lat: 36.3729,
-    lon: -94.2088,
+    id: 'arlington',
+    label: 'Arlington',
+    short: 'Arlington, VA',
+    lat: 38.8816,
+    lon: -77.091,
   },
   {
-    id: 'springdale',
-    label: 'Springdale',
-    short: 'Springdale, AR',
-    lat: 36.1867,
-    lon: -94.1288,
+    id: 'dc',
+    label: 'Washington, DC',
+    short: 'Washington, DC',
+    lat: 38.9072,
+    lon: -77.0369,
   },
   {
     id: 'baltimore',
@@ -51,7 +51,7 @@ function loadLocId() {
   } catch {
     /* ignore */
   }
-  return 'bentonville';
+  return 'arlington';
 }
 
 function loadCache() {
@@ -115,7 +115,7 @@ function parseHourly(json) {
   const times = h.time || [];
   const out = [];
   for (let i = 0; i < times.length; i++) {
-    const iso = times[i]; // "2026-09-23T14:00"
+    const iso = times[i];
     const hour = Number(iso.slice(11, 13));
     const code = Number(h.weather_code?.[i] ?? 0);
     const meta = weatherIcon(code);
@@ -216,7 +216,7 @@ export function useWeather(nyHour) {
     if (cache?.data?.locId === loadLocId()) return cache.data;
     return null;
   });
-  const [status, setStatus] = useState('idle'); // idle | loading | ok | stale | offline
+  const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState(null);
 
   const loc = useMemo(

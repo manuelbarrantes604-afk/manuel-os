@@ -1797,3 +1797,262 @@
     padding: 7px 4px;
   }
 }
+
+/* —— v12: weight goal (no daily weigh-in) —— */
+.weight-goal-card .wg-prompt {
+  margin: 0 0 10px;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+.wg-deadline {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.wg-deadline strong {
+  color: var(--text-soft);
+  font-weight: 650;
+}
+
+.wg-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.wg-target-field .wg-target-value {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.wg-track {
+  margin: 4px 0 10px;
+}
+
+.wg-track-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: visible;
+}
+
+.wg-track-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(22, 163, 74, 0.35), var(--green));
+  max-width: 100%;
+}
+
+.wg-track-marker {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--green-dark);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.wg-track-labels,
+.wg-track-captions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.wg-track-captions {
+  font-family: var(--sans);
+  font-size: 0.66rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.wg-track-mid {
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+.wg-stats {
+  margin: 0;
+  padding-top: 4px;
+}
+
+.wg-stats p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.honesty-lite .honesty-score {
+  font-size: 1.05rem;
+  min-width: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.goal-list-lite {
+  gap: 8px;
+}
+
+.goal-row-lite {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.goal-row-lite:last-child {
+  border-bottom: 0;
+}
+
+.goal-row-lite strong {
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+}
+
+.goal-row-lite span {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.goal-weight-note {
+  margin: 10px 0 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* —— v12: agenda day headers + drag + mic —— */
+.ag-day-weekday {
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.ag-day-date {
+  font-weight: 750;
+  color: var(--green-dark);
+  letter-spacing: -0.02em;
+}
+
+.ag-week-day-head .ag-day-label {
+  margin: 0;
+  flex: 1;
+}
+
+.ag-month-day {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+
+.ag-month-day .ag-day-block {
+  border-top: 0;
+  padding: 0;
+}
+
+.ag-drop-ready {
+  outline: 1px dashed rgba(22, 163, 74, 0.35);
+  outline-offset: 2px;
+}
+
+.ag-drop-over,
+.ag-day-block.ag-drop-over {
+  background: rgba(22, 163, 74, 0.08);
+  outline-color: var(--green);
+}
+
+.ag-row {
+  cursor: grab;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.ag-row:active {
+  cursor: grabbing;
+}
+
+.ag-row.ag-dragging {
+  opacity: 0.65;
+}
+
+.ag-drag-hint {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  color: var(--green-dark);
+  font-weight: 550;
+}
+
+.ag-drag-hint.soft {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ag-composer .ag-composer-top {
+  align-items: center;
+}
+
+.ag-mic {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  color: var(--text-soft);
+}
+
+.ag-mic.listening {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: var(--danger);
+  animation: ag-pulse 1.1s ease infinite;
+}
+
+@keyframes ag-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.ag-composer {
+  gap: 6px;
+}
+
+@media (max-width: 390px) {
+  .wg-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .mos-frame {
+    max-width: 390px;
+  }
+}

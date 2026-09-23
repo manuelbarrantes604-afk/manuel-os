@@ -50,6 +50,21 @@ export function formatDayLabel(dateKey) {
   });
 }
 
+/** Agenda day header parts: "Monday," + "9/21" (weekday full + M/D). */
+export function formatAgendaDayParts(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const weekday = utc.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    weekday: 'long',
+  });
+  return {
+    weekday,
+    date: `${m}/${d}`,
+    label: `${weekday}, ${m}/${d}`,
+  };
+}
+
 /** ISO week number (UTC noon of dateKey). */
 export function weekLabel(dateKey) {
   const [y, m, d] = dateKey.split('-').map(Number);

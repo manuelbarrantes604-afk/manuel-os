@@ -2,12 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   agendaMonthKeys,
   monthLabel,
-  shortMonth,
   weekContaining,
   weekRangeLabel,
   weeksInMonth,
 } from '../hooks/useAgenda';
-import { formatDayLabel, weekStripFor } from '../lib/time';
+import { formatAgendaDayParts, weekStripFor } from '../lib/time';
 
 const VIEWS = [
   { id: 'bydate', label: 'By date' },
@@ -15,18 +14,44 @@ const VIEWS = [
   { id: 'monthly', label: 'Monthly' },
 ];
 
-function formatDayHead(dateKey) {
-  return formatDayLabel(dateKey);
+const SpeechRecognitionAPI =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null;
+
+function DayHead({ dateKey, today }) {
+  const parts = formatAgendaDayParts(dateKey);
+  return (
+    <p className="ag-day-label">
+      <span className="ag-day-weekday">{parts.weekday},</span>{' '}
+      <strong className="ag-day-date">{parts.date}</strong>
+      {today ? <span className="ag-today-tag">Today</span> : null}
+    </p>
+  );
 }
 
-function AgendaRow({ item, todayKey, onToggle, onRemove, onRename }) {
+function AgendaRow({
+  item,
+  todayKey,
+  onToggle,
+  onRemove,
+  onRename,
+  onDragStart,
+  onDragEnd,
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.title);
   const inputRef = useRef(null);
+  const longPressTimer = useRef(null);
+  const touchDragging = useRef(false);
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
+
+  useEffect(() => {
+    setDraft(item.title);
+  }, [item.title]);
 
   const overdue = item.due && !item.done && item.due < todayKey;
 
@@ -37,9 +62,51 @@ function AgendaRow({ item, todayKey, onToggle, onRemove, onRename }) {
     setEditing(false);
   };
 
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   return (
     <li
       className={`check-row fu-row ag-row ${item.done ? 'done' : ''} ${overdue ? 'overdue' : ''}`}
+      draggable={!editing}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.(item.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      onTouchStart={(e) => {
+        if (editing) return;
+        e.stopPropagation();
+        clearLongPress();
+        longPressTimer.current = setTimeout(() => {
+          touchDragging.current = true;
+          onDragStart?.(item.id);
+          if (navigator.vibrate) {
+            try {
+              navigator.vibrate(12);
+            } catch {
+              /* ignore */
+            }
+          }
+        }, 380);
+      }}
+      onTouchEnd={(e) => {
+        e.stopPropagation();
+        clearLongPress();
+      }}
+      onTouchMove={(e) => {
+        e.stopPropagation();
+        if (!touchDragging.current) clearLongPress();
+      }}
+      onTouchCancel={(e) => {
+        e.stopPropagation();
+        clearLongPress();
+      }}
     >
       <button
         type="button"
@@ -93,7 +160,15 @@ function AgendaRow({ item, todayKey, onToggle, onRemove, onRename }) {
   );
 }
 
-function ItemList({ items, todayKey, onToggle, onRemove, onRename }) {
+function ItemList({
+  items,
+  todayKey,
+  onToggle,
+  onRemove,
+  onRename,
+  onDragStart,
+  onDragEnd,
+}) {
   if (!items.length) return null;
   return (
     <ul className="check-list ag-bullets">
@@ -105,9 +180,79 @@ function ItemList({ items, todayKey, onToggle, onRemove, onRename }) {
           onToggle={onToggle}
           onRemove={onRemove}
           onRename={onRename}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
         />
       ))}
     </ul>
+  );
+}
+
+function DayDropZone({
+  dateKey,
+  todayKey,
+  items,
+  isToday,
+  draggingId,
+  onToggle,
+  onRemove,
+  onRename,
+  onDragStart,
+  onDragEnd,
+  onDropDue,
+  emptyLabel = 'Nothing dated',
+  showEmpty = true,
+}) {
+  const [over, setOver] = useState(false);
+
+  const handleDragOver = (e) => {
+    if (!draggingId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setOver(true);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setOver(false);
+    const id = e.dataTransfer.getData('text/plain') || draggingId;
+    if (id) onDropDue(id, dateKey);
+    onDragEnd?.();
+  };
+
+  const handleActivateDrop = () => {
+    if (!draggingId) return;
+    onDropDue(draggingId, dateKey);
+    onDragEnd?.();
+  };
+
+  return (
+    <div
+      className={`ag-day-block ${isToday ? 'is-today' : ''} ${over ? 'ag-drop-over' : ''} ${draggingId ? 'ag-drop-ready' : ''}`}
+      data-due={dateKey}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setOver(false)}
+      onDrop={handleDrop}
+      onClick={draggingId ? handleActivateDrop : undefined}
+      role={draggingId ? 'button' : undefined}
+    >
+      <DayHead dateKey={dateKey} today={isToday} />
+      {items.length ? (
+        <ItemList
+          items={items}
+          todayKey={todayKey}
+          onToggle={onToggle}
+          onRemove={onRemove}
+          onRename={onRename}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
+      ) : showEmpty ? (
+        <p className="ag-empty-day">
+          {draggingId ? 'Drop here' : emptyLabel}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -142,6 +287,10 @@ function ByDateView({
   onToggle,
   onRemove,
   onRename,
+  draggingId,
+  onDragStart,
+  onDragEnd,
+  onDropDue,
 }) {
   const months = useMemo(() => agendaMonthKeys(todayKey), [todayKey]);
   const todayYm = todayKey.slice(0, 7);
@@ -160,7 +309,12 @@ function ByDateView({
             onToggle={onToggle}
             onRemove={onRemove}
             onRename={onRename}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
           />
+          {draggingId ? (
+            <p className="ag-drag-hint">Hold & drop onto a day to reschedule</p>
+          ) : null}
         </section>
       )}
 
@@ -173,8 +327,10 @@ function ByDateView({
             .filter((d) => d.key.startsWith(ym))
             .map((d) => {
               const list = itemsForDate(d.key);
-              const show = list.length > 0 || d.key === todayKey;
-              if (list.some((i) => !i.done)) openCount += list.filter((i) => !i.done).length;
+              const show =
+                list.length > 0 || d.key === todayKey || Boolean(draggingId);
+              if (list.some((i) => !i.done))
+                openCount += list.filter((i) => !i.done).length;
               return show
                 ? {
                     key: d.key,
@@ -193,12 +349,10 @@ function ByDateView({
           <Accordion
             key={ym}
             title={monthLabel(ym)}
-            subtitle={
-              hasContent
-                ? `${openCount} open`
-                : 'Empty'
+            subtitle={hasContent ? `${openCount} open` : 'Empty'}
+            defaultOpen={
+              ym === todayYm || (ym === '2026-09' && !months.includes(todayYm))
             }
-            defaultOpen={ym === todayYm || (ym === '2026-09' && !months.includes(todayYm))}
           >
             {mq.length > 0 && (
               <div className="ag-month-queue">
@@ -209,6 +363,8 @@ function ByDateView({
                   onToggle={onToggle}
                   onRemove={onRemove}
                   onRename={onRename}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
                 />
               </div>
             )}
@@ -223,26 +379,20 @@ function ByDateView({
                   tone="ag-week"
                 >
                   {w.dayBlocks.map((d) => (
-                    <div
+                    <DayDropZone
                       key={d.key}
-                      className={`ag-day-block ${d.today ? 'is-today' : ''}`}
-                    >
-                      <p className="ag-day-label">
-                        {formatDayHead(d.key)}
-                        {d.today ? <span className="ag-today-tag">Today</span> : null}
-                      </p>
-                      {d.items.length ? (
-                        <ItemList
-                          items={d.items}
-                          todayKey={todayKey}
-                          onToggle={onToggle}
-                          onRemove={onRemove}
-                          onRename={onRename}
-                        />
-                      ) : (
-                        <p className="ag-empty-day">Nothing dated</p>
-                      )}
-                    </div>
+                      dateKey={d.key}
+                      todayKey={todayKey}
+                      items={d.items}
+                      isToday={d.today}
+                      draggingId={draggingId}
+                      onToggle={onToggle}
+                      onRemove={onRemove}
+                      onRename={onRename}
+                      onDragStart={onDragStart}
+                      onDragEnd={onDragEnd}
+                      onDropDue={onDropDue}
+                    />
                   ))}
                 </Accordion>
               );
@@ -272,6 +422,10 @@ function WeeklyAgendaView({
   onToggle,
   onRemove,
   onRename,
+  draggingId,
+  onDragStart,
+  onDragEnd,
+  onDropDue,
 }) {
   const week = useMemo(() => weekContaining(anchorKey), [anchorKey]);
   const weekKeys = week.map((d) => d.key);
@@ -319,14 +473,33 @@ function WeeklyAgendaView({
           return (
             <section
               key={d.key}
-              className={`card ag-week-day ${isToday ? 'is-today' : ''}`}
+              className={`card ag-week-day ${isToday ? 'is-today' : ''} ${draggingId ? 'ag-drop-ready' : ''}`}
+              data-due={d.key}
+              onDragOver={(e) => {
+                if (!draggingId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData('text/plain') || draggingId;
+                if (id) onDropDue(id, d.key);
+                onDragEnd?.();
+              }}
+              onClick={
+                draggingId
+                  ? () => {
+                      onDropDue(draggingId, d.key);
+                      onDragEnd?.();
+                    }
+                  : undefined
+              }
             >
               <div className="ag-week-day-head">
-                <strong>
-                  {d.dow} {Number(d.key.slice(8))}
-                </strong>
-                {isToday ? <span className="ag-today-tag">Today</span> : null}
-                <span className="card-sub">{items.filter((i) => !i.done).length || '—'}</span>
+                <DayHead dateKey={d.key} today={isToday} />
+                <span className="card-sub">
+                  {items.filter((i) => !i.done).length || '—'}
+                </span>
               </div>
               {items.length ? (
                 <ItemList
@@ -335,9 +508,11 @@ function WeeklyAgendaView({
                   onToggle={onToggle}
                   onRemove={onRemove}
                   onRename={onRename}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
                 />
               ) : (
-                <p className="ag-empty-day">—</p>
+                <p className="ag-empty-day">{draggingId ? 'Drop here' : '—'}</p>
               )}
             </section>
           );
@@ -362,19 +537,21 @@ function MonthlyAgendaView({
   onToggle,
   onRemove,
   onRename,
+  draggingId,
+  onDragStart,
+  onDragEnd,
+  onDropDue,
+  selected,
+  setSelected,
 }) {
-  const [selected, setSelected] = useState(todayKey);
-
   useEffect(() => {
     if (!selected.startsWith(monthYm)) {
       setSelected(
         todayKey.startsWith(monthYm) ? todayKey : `${monthYm}-01`,
       );
     }
-  }, [monthYm, selected, todayKey]);
+  }, [monthYm, selected, todayKey, setSelected]);
 
-
-  // Grid starts Monday
   const firstKey = `${monthYm}-01`;
   const firstStrip = weekStripFor(firstKey);
   const mondayOfFirst = firstStrip[0].key;
@@ -394,7 +571,6 @@ function MonthlyAgendaView({
       selected: key === selected,
     });
   }
-  // Trim trailing empty weeks outside month
   while (cells.length > 35) {
     const last7 = cells.slice(-7);
     if (last7.every((c) => !c.inMonth)) cells.splice(-7);
@@ -420,7 +596,7 @@ function MonthlyAgendaView({
         </button>
         <div className="ag-nav-center">
           <strong>{monthLabel(monthYm)}</strong>
-          <span className="ag-nav-sub">Outlook grid</span>
+          <span className="ag-nav-sub">Scan</span>
         </div>
         <button
           type="button"
@@ -446,16 +622,29 @@ function MonthlyAgendaView({
               type="button"
               role="gridcell"
               disabled={!c.inMonth}
-              className={`ag-cal-cell ${c.inMonth ? '' : 'out'} ${c.today ? 'today' : ''} ${c.selected ? 'selected' : ''}`}
+              className={`ag-cal-cell ${c.inMonth ? '' : 'out'} ${c.today ? 'today' : ''} ${c.selected ? 'selected' : ''} ${draggingId && c.inMonth ? 'ag-drop-ready' : ''}`}
               onClick={() => c.inMonth && setSelected(c.key)}
+              onDragOver={(e) => {
+                if (!draggingId || !c.inMonth) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(e) => {
+                if (!c.inMonth) return;
+                e.preventDefault();
+                const id = e.dataTransfer.getData('text/plain') || draggingId;
+                if (id) {
+                  onDropDue(id, c.key);
+                  setSelected(c.key);
+                }
+                onDragEnd?.();
+              }}
               aria-label={`${c.key}${c.count ? `, ${c.count} items` : ''}`}
             >
               <span className="ag-cal-num">{c.inMonth ? c.day : ''}</span>
               {c.count > 0 ? (
                 <span className="ag-cal-dots">
-                  {c.count <= 3
-                    ? '•'.repeat(c.count)
-                    : `•${c.count}`}
+                  {c.count <= 3 ? '•'.repeat(c.count) : `•${c.count}`}
                 </span>
               ) : (
                 <span className="ag-cal-dots muted"> </span>
@@ -465,24 +654,21 @@ function MonthlyAgendaView({
         </div>
       </div>
 
-      <section className="card">
-        <div className="card-head">
-          <h2>{formatDayHead(selected)}</h2>
-          <span className="card-sub">
-            {selected === todayKey ? 'Today' : shortMonth(selected.slice(0, 7))}
-          </span>
-        </div>
-        {selectedItems.length ? (
-          <ItemList
-            items={selectedItems}
-            todayKey={todayKey}
-            onToggle={onToggle}
-            onRemove={onRemove}
-            onRename={onRename}
-          />
-        ) : (
-          <p className="ag-empty-day">No items this day</p>
-        )}
+      <section className="card ag-month-day">
+        <DayDropZone
+          dateKey={selected}
+          todayKey={todayKey}
+          items={selectedItems}
+          isToday={selected === todayKey}
+          draggingId={draggingId}
+          onToggle={onToggle}
+          onRemove={onRemove}
+          onRename={onRename}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDropDue={onDropDue}
+          emptyLabel="No items this day"
+        />
       </section>
 
       {mq.length > 0 && (
@@ -497,10 +683,28 @@ function MonthlyAgendaView({
             onToggle={onToggle}
             onRemove={onRemove}
             onRename={onRename}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
           />
         </section>
       )}
     </div>
+  );
+}
+
+function MicButton({ listening, onToggle, supported }) {
+  if (!supported) return null;
+  return (
+    <button
+      type="button"
+      className={`ag-mic ${listening ? 'listening' : ''}`}
+      onClick={onToggle}
+      aria-label={listening ? 'Stop listening' : 'Add by voice'}
+      aria-pressed={listening}
+      title={listening ? 'Listening…' : 'Speak to add'}
+    >
+      {listening ? '●' : '🎤'}
+    </button>
   );
 }
 
@@ -515,22 +719,38 @@ export default function AgendaView({
   toggle,
   remove,
   rename,
+  setDue,
   focusComposer,
 }) {
   const [view, setView] = useState('bydate');
   const [title, setTitle] = useState('');
-  const [due, setDue] = useState(todayKey);
+  const [due, setDueLocal] = useState(todayKey);
   const [weekAnchor, setWeekAnchor] = useState(todayKey);
   const [monthYm, setMonthYm] = useState(todayKey.slice(0, 7));
+  const [monthSelected, setMonthSelected] = useState(todayKey);
+  const [draggingId, setDraggingId] = useState(null);
+  const [listening, setListening] = useState(false);
   const titleRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const speechSupported = Boolean(SpeechRecognitionAPI);
 
   useEffect(() => {
-    setDue(todayKey);
+    setDueLocal(todayKey);
   }, [todayKey]);
 
   useEffect(() => {
     if (focusComposer) titleRef.current?.focus();
   }, [focusComposer]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
 
   const submit = (e) => {
     e?.preventDefault?.();
@@ -538,8 +758,72 @@ export default function AgendaView({
     if (!t) return;
     add(t, due || todayKey);
     setTitle('');
-    setDue(todayKey);
   };
+
+  const onDropDue = (id, dateKey) => {
+    if (!id || !dateKey) return;
+    setDue(id, dateKey);
+    setDraggingId(null);
+  };
+
+  const toggleMic = () => {
+    if (!SpeechRecognitionAPI) return;
+
+    if (listening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      setListening(false);
+      return;
+    }
+
+    let recognition;
+    try {
+      recognition = new SpeechRecognitionAPI();
+    } catch {
+      return;
+    }
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0]?.transcript || '')
+        .join(' ')
+        .trim();
+      if (!transcript) return;
+      // Prefer composer fill so user can edit; if empty composer, add directly
+      setTitle((prev) => {
+        const next = prev.trim() ? `${prev.trim()} ${transcript}` : transcript;
+        return next;
+      });
+      titleRef.current?.focus();
+    };
+    recognition.onerror = () => {
+      setListening(false);
+    };
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  };
+
+  // Sync selected date into composer when picking in monthly view
+  useEffect(() => {
+    if (view === 'monthly' && monthSelected) {
+      setDueLocal(monthSelected);
+    }
+  }, [view, monthSelected]);
 
   return (
     <div className="view agenda-view">
@@ -570,7 +854,7 @@ export default function AgendaView({
         ))}
       </div>
 
-      <form className="period-card fu-composer" onSubmit={submit}>
+      <form className="period-card fu-composer ag-composer" onSubmit={submit}>
         <div className="ag-composer-top">
           <input
             ref={titleRef}
@@ -581,7 +865,16 @@ export default function AgendaView({
             onChange={(e) => setTitle(e.target.value)}
             aria-label="Agenda title"
           />
-          <button type="submit" className="fu-composer-add ag-plus" aria-label="Add">
+          <MicButton
+            supported={speechSupported}
+            listening={listening}
+            onToggle={toggleMic}
+          />
+          <button
+            type="submit"
+            className="fu-composer-add ag-plus"
+            aria-label="Add"
+          >
             +
           </button>
         </div>
@@ -590,11 +883,20 @@ export default function AgendaView({
             className="fu-composer-date"
             type="date"
             value={due}
-            onChange={(e) => setDue(e.target.value)}
-            aria-label="Date"
+            onChange={(e) => setDueLocal(e.target.value)}
+            aria-label="Date for new item"
           />
-          <span className="ag-composer-hint">Enter to add</span>
+          <span className="ag-composer-hint">
+            {speechSupported
+              ? 'Enter to add · mic for date above'
+              : 'Enter to add'}
+          </span>
         </div>
+        {draggingId ? (
+          <p className="ag-drag-hint">Drop onto a day to move</p>
+        ) : (
+          <p className="ag-drag-hint soft">Hold / drag an item onto a day to move</p>
+        )}
       </form>
 
       {view === 'bydate' && (
@@ -606,6 +908,10 @@ export default function AgendaView({
           onToggle={toggle}
           onRemove={remove}
           onRename={rename}
+          draggingId={draggingId}
+          onDragStart={setDraggingId}
+          onDragEnd={() => setDraggingId(null)}
+          onDropDue={onDropDue}
         />
       )}
       {view === 'weekly' && (
@@ -617,6 +923,10 @@ export default function AgendaView({
           onToggle={toggle}
           onRemove={remove}
           onRename={rename}
+          draggingId={draggingId}
+          onDragStart={setDraggingId}
+          onDragEnd={() => setDraggingId(null)}
+          onDropDue={onDropDue}
         />
       )}
       {view === 'monthly' && (
@@ -629,11 +939,17 @@ export default function AgendaView({
           onToggle={toggle}
           onRemove={remove}
           onRename={rename}
+          draggingId={draggingId}
+          onDragStart={setDraggingId}
+          onDragEnd={() => setDraggingId(null)}
+          onDropDue={onDropDue}
+          selected={monthSelected}
+          setSelected={setMonthSelected}
         />
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · agenda · local · v11</p>
+        <p>Manuel OS · agenda · local · v12</p>
       </footer>
     </div>
   );
