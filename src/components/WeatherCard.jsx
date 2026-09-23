@@ -1,4 +1,12 @@
+import { useState } from 'react';
 import { WEATHER_LOCS } from '../hooks/useWeather';
+
+function formatHour(hour) {
+  if (hour === 0) return '12 AM';
+  if (hour === 12) return '12 PM';
+  if (hour < 12) return `${hour} AM`;
+  return `${hour - 12} PM`;
+}
 
 export default function WeatherCard({
   locId,
@@ -9,19 +17,20 @@ export default function WeatherCard({
   morningBrief,
   refresh,
 }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const rainLine = data
+    ? data.willRain
+      ? `Yes · ${data.precipProb}%${data.precipKind ? ` ${data.precipKind}` : ''}`
+      : data.precipKind === 'snow'
+        ? `Snow · ${data.precipProb}%`
+        : `No · ${data.precipProb}%`
+    : null;
+
   return (
-    <section className="period-card weather-card" aria-label="Weather brief">
-      <div className="period-head weather-head">
-        <div>
-          <h2>
-            Weather
-            {morningBrief ? (
-              <span className="now-badge morning-brief-badge">Morning brief</span>
-            ) : null}
-          </h2>
-          <p className="coach-line">Open-Meteo · local brief</p>
-        </div>
-        <div className="weather-actions">
+    <section className="period-card weather-card weather-ios" aria-label="Weather">
+      <div className="weather-top">
+        <div className="weather-top-left">
           <label className="weather-loc-label" htmlFor="weather-loc">
             <span className="sr-only">Location</span>
             <select
@@ -38,19 +47,22 @@ export default function WeatherCard({
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="weather-refresh"
-            onClick={refresh}
-            disabled={status === 'loading'}
-          >
-            Refresh
-          </button>
+          {morningBrief ? (
+            <span className="now-badge morning-brief-badge">Morning brief</span>
+          ) : null}
         </div>
+        <button
+          type="button"
+          className="weather-refresh"
+          onClick={refresh}
+          disabled={status === 'loading'}
+        >
+          Refresh
+        </button>
       </div>
 
       {!data && (status === 'loading' || status === 'idle') && (
-        <p className="weather-body muted">Loading brief…</p>
+        <p className="weather-body muted">Loading…</p>
       )}
 
       {!data && status === 'offline' && (
@@ -58,26 +70,68 @@ export default function WeatherCard({
       )}
 
       {data && (
-        <div className="weather-body">
-          <p className="weather-line">
-            <strong>
-              {data.locLabel} · {data.temp}°F
-            </strong>
-            <span>
-              {' '}
-              · feels {data.apparent}° / High {data.high} / Low {data.low}
-            </span>
-          </p>
-          <p className="weather-line soft">
-            {data.precip} · {data.wind} mph
-          </p>
-          <p className="weather-dress">{data.dressLine}</p>
+        <>
+          <div className="weather-compact">
+            <div className="weather-temp-block">
+              <span className="weather-temp" aria-label={`${data.temp} degrees`}>
+                {data.temp}°
+              </span>
+              <span className="weather-condition">
+                {data.icon} {data.condition}
+              </span>
+            </div>
+            <div className="weather-facts">
+              <p className="weather-rain">
+                <span className="weather-fact-label">Rain today?</span>{' '}
+                <strong>{rainLine}</strong>
+              </p>
+              <p className="weather-hl">
+                H {data.high}° · L {data.low}°
+              </p>
+              <p className="weather-dress">{data.dressLine}</p>
+            </div>
+          </div>
+
           {(status === 'stale' || errorMsg) && (
             <p className="weather-stale">
               {errorMsg || 'Stale — last cached brief'}
             </p>
           )}
-        </div>
+
+          {Array.isArray(data.hourly) && data.hourly.length > 0 && (
+            <div className="weather-hourly-wrap">
+              <button
+                type="button"
+                className="weather-expand"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                <span>{expanded ? 'Hide hourly' : 'Hourly forecast'}</span>
+                <span className="weather-chevron" aria-hidden="true">
+                  {expanded ? '▴' : '▾'}
+                </span>
+              </button>
+              {expanded && (
+                <ul className="weather-hourly" aria-label="Hourly forecast">
+                  {data.hourly.map((h) => (
+                    <li key={h.time} className="weather-hour-row">
+                      <span className="wh-time">{formatHour(h.hour)}</span>
+                      <span className="wh-icon" title={h.condition}>
+                        {h.icon}
+                      </span>
+                      <span className="wh-temp mono">{h.temp}°</span>
+                      <span className="wh-precip">
+                        {h.precipProb}%
+                        {h.snow > 0 ? ' snow' : h.rain > 0 || h.precipProb >= 40 ? ' rain' : ''}
+                      </span>
+                      <span className="wh-cond">{h.condition}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

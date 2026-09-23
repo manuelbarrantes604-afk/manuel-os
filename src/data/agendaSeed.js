@@ -1,0 +1,170 @@
+/**
+ * First-load agenda seed (Sep 23–Oct 1 2026 + October month).
+ * Seeded only when manuel-os-agenda-v1 is empty.
+ * Migrates from manuel-os-followups-v2 if present.
+ */
+
+export const AGENDA_STORAGE_KEY = 'manuel-os-agenda-v1';
+export const FOLLOWUPS_LEGACY_KEY = 'manuel-os-followups-v2';
+
+const CREATED = '2026-09-23T12:00:00.000-04:00';
+
+/** @typedef {{ id: string, title: string, due: string|null, month: string|null, done: boolean, doneAt: string|null, createdAt: string, earlySurface?: boolean }} AgendaItem */
+
+/** @type {AgendaItem[]} */
+export const AGENDA_SEED = [
+  {
+    id: 'fu-0923-biz-whf',
+    title: 'Biz meeting + WHF questions',
+    due: '2026-09-23',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0924-uber-marina',
+    title: 'Uber Marina Bentonville',
+    due: '2026-09-24',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0925-springdale-cleaning',
+    title: 'Springdale Cleaning',
+    due: '2026-09-25',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0925-loa-approval',
+    title: 'LOA approval',
+    due: '2026-09-25',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0926-dunia-trucks',
+    title: '3am: Drop Dunia + Trucks Rental',
+    due: '2026-09-26',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+    earlySurface: true,
+  },
+  {
+    id: 'fu-0927-church-dima',
+    title: 'Church + Dima Clean Bentonville',
+    due: '2026-09-27',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0928-dima-clean',
+    title: 'Dima Clean Springdale',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0928-photo-shoot',
+    title: 'Photo Shoot 2pm Airbnb',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0928-paycheck',
+    title: 'Check Paycheck',
+    due: '2026-09-28',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0929-ivania-dima',
+    title: 'Ivania take Dima Bus station',
+    due: '2026-09-29',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0929-josh-lunch',
+    title: 'Remind Josh O Friday Lunch',
+    due: '2026-09-29',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-dima-ultra',
+    title: 'Pick Dima + Ultra Ring',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-laura-receipt',
+    title: 'Laura $3500 (Receipt install)',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-0930-pack-clothes',
+    title: 'Pack clothes',
+    due: '2026-09-30',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-1001-holocaust-baltimore',
+    title: 'Holocaust + Baltimore',
+    due: '2026-10-01',
+    month: null,
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-oct-turno-marvin-health',
+    title: 'Turno + Marvin Pay + Health Plans',
+    due: null,
+    month: '2026-10',
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+  {
+    id: 'fu-oct-factor',
+    title: 'Order Factor',
+    due: null,
+    month: '2026-10',
+    done: false,
+    doneAt: null,
+    createdAt: CREATED,
+  },
+];

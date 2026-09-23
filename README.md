@@ -6,12 +6,13 @@ Live: https://manuelbarrantes604-afk.github.io/manuel-os/
 
 ## What it is
 
-Local-first daily OS for Manuel — six Pass/Fail checks (Morning + Night), Close day, Progress, Weekly coach, morning weather dress brief, and Follow-ups.
+Local-first daily OS for Manuel — six Pass/Fail checks (Morning + Night), Close day, Progress, Agenda (executive calendar), and a compact morning weather brief.
 
 - **6 checks:** Wake 5:00 · Leave 5:30 · Exercise 6:00 · 1hr AI · Cal AI review · Family time
-- **Weather brief:** Open-Meteo (Bentonville default; Springdale / Baltimore) + dress line — not a Pass/Fail
-- **Follow-ups:** dated open loops; overdue stays; never blocks Close day
-- **Data:** `localStorage` only (`manuel-os-v9` checks, `manuel-os-followups-v2`, weather cache/loc)
+- **Weather:** Open-Meteo (Bentonville default; Springdale / Baltimore) — temp, rain today?, H/L, dress line, expandable hourly — not a Pass/Fail
+- **Agenda:** dated execution list — By date / Weekly / Monthly; overdue rolls forward; never blocks Close day
+- **Nav:** Today · Progress · Agenda
+- **Data:** `localStorage` only (`manuel-os-v9` checks, `manuel-os-agenda-v1`, weather cache/loc)
 - **Timezone:** America/New_York
 
 ## Add to Home Screen

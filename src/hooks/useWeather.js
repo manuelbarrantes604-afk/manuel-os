@@ -29,6 +29,21 @@ export const WEATHER_LOCS = [
   },
 ];
 
+/** WMO weather code → short icon + label */
+export function weatherIcon(code) {
+  const c = Number(code) || 0;
+  if (c === 0) return { icon: '☀', label: 'Clear' };
+  if (c <= 3) return { icon: '🌤', label: 'Partly cloudy' };
+  if (c <= 48) return { icon: '🌫', label: 'Fog' };
+  if (c <= 57) return { icon: '🌦', label: 'Drizzle' };
+  if (c <= 67) return { icon: '🌧', label: 'Rain' };
+  if (c <= 77) return { icon: '❄', label: 'Snow' };
+  if (c <= 82) return { icon: '🌦', label: 'Showers' };
+  if (c <= 86) return { icon: '❄', label: 'Snow showers' };
+  if (c <= 99) return { icon: '⛈', label: 'Thunder' };
+  return { icon: '☁', label: 'Cloudy' };
+}
+
 function loadLocId() {
   try {
     const id = localStorage.getItem(LOC_KEY);
@@ -72,10 +87,19 @@ function buildUrl(loc) {
       'weather_code',
       'wind_speed_10m',
     ].join(','),
+    hourly: [
+      'temperature_2m',
+      'precipitation_probability',
+      'precipitation',
+      'weather_code',
+      'rain',
+      'snowfall',
+    ].join(','),
     daily: [
       'temperature_2m_max',
       'temperature_2m_min',
       'precipitation_probability_max',
+      'precipitation_sum',
       'weather_code',
     ].join(','),
     temperature_unit: 'fahrenheit',
@@ -86,9 +110,61 @@ function buildUrl(loc) {
   return `https://api.open-meteo.com/v1/forecast?${params}`;
 }
 
+function parseHourly(json) {
+  const h = json.hourly || {};
+  const times = h.time || [];
+  const out = [];
+  for (let i = 0; i < times.length; i++) {
+    const iso = times[i]; // "2026-09-23T14:00"
+    const hour = Number(iso.slice(11, 13));
+    const code = Number(h.weather_code?.[i] ?? 0);
+    const meta = weatherIcon(code);
+    const precipProb = Math.round(Number(h.precipitation_probability?.[i] ?? 0));
+    const rain = Number(h.rain?.[i] ?? 0);
+    const snow = Number(h.snowfall?.[i] ?? 0);
+    out.push({
+      time: iso,
+      hour,
+      temp: Math.round(Number(h.temperature_2m?.[i])),
+      precipProb,
+      precip: Number(h.precipitation?.[i] ?? 0),
+      rain,
+      snow,
+      weatherCode: code,
+      icon: meta.icon,
+      condition: meta.label,
+    });
+  }
+  return out;
+}
+
+function willRainToday(precipProb, weatherCode, rain, snow, hourly) {
+  const snowy =
+    snow > 0 ||
+    (weatherCode >= 71 && weatherCode <= 77) ||
+    (weatherCode >= 85 && weatherCode <= 86);
+  const rainy =
+    rain > 0 ||
+    (weatherCode >= 51 && weatherCode <= 67) ||
+    (weatherCode >= 80 && weatherCode <= 82) ||
+    (weatherCode >= 95 && weatherCode <= 99);
+  const hourlyRain = (hourly || []).some(
+    (h) =>
+      h.precipProb >= 40 ||
+      h.rain > 0 ||
+      (h.weatherCode >= 51 && h.weatherCode <= 67) ||
+      (h.weatherCode >= 80 && h.weatherCode <= 82) ||
+      (h.weatherCode >= 95 && h.weatherCode <= 99),
+  );
+  const yes = !snowy && (rainy || precipProb >= 40 || hourlyRain);
+  const kind = snowy ? 'snow' : yes ? 'rain' : null;
+  return { willRain: yes, kind, precipProb };
+}
+
 function parseWeather(json, loc) {
   const cur = json.current || {};
   const daily = json.daily || {};
+  const hourly = parseHourly(json);
   const temp = Math.round(Number(cur.temperature_2m));
   const apparent = Math.round(Number(cur.apparent_temperature));
   const high = Math.round(Number(daily.temperature_2m_max?.[0]));
@@ -109,6 +185,8 @@ function parseWeather(json, loc) {
     rain,
     snow,
   });
+  const rainToday = willRainToday(precipProb, weatherCode, rain, snow, hourly);
+  const iconMeta = weatherIcon(weatherCode);
   return {
     locId: loc.id,
     locLabel: loc.label,
@@ -120,8 +198,13 @@ function parseWeather(json, loc) {
     precip,
     wind,
     weatherCode,
+    icon: iconMeta.icon,
+    condition: iconMeta.label,
     dressLine: dress.line,
     dressShort: dress.short,
+    willRain: rainToday.willRain,
+    precipKind: rainToday.kind,
+    hourly,
     fetchedAt: Date.now(),
   };
 }
@@ -154,8 +237,10 @@ export function useWeather(nyHour) {
   const fetchWeather = useCallback(
     async ({ force = false } = {}) => {
       const cache = loadCache();
+      const hasHourly = Array.isArray(cache?.data?.hourly);
       const freshEnough =
         !force &&
+        hasHourly &&
         cache?.data?.locId === loc.id &&
         typeof cache.fetchedAt === 'number' &&
         Date.now() - cache.fetchedAt < CACHE_MS;

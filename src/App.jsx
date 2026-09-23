@@ -7,32 +7,28 @@ import {
   STREAKS,
 } from './data/seed';
 import WeatherCard from './components/WeatherCard';
-import FollowupsStrip from './components/FollowupsStrip';
-import FollowupsView from './components/FollowupsView';
+import AgendaView from './components/AgendaView';
 import { useCheckins } from './hooks/useCheckins';
-import { useFollowups } from './hooks/useFollowups';
+import { useAgenda } from './hooks/useAgenda';
 import { useWeather } from './hooks/useWeather';
 import { useWeight } from './hooks/useWeight';
 import { activePeriodId, formatDayLabel } from './lib/time';
-import { buildWeeklyReport } from './lib/weeklyCoach';
 import './App.css';
 
 const NAV = [
   { id: 'today', label: 'Today', icon: '○' },
-  { id: 'followups', label: 'Follow-ups', icon: '☐' },
   { id: 'progress', label: 'Progress', icon: '◎' },
-  { id: 'weekly', label: 'Weekly', icon: '◉' },
+  { id: 'agenda', label: 'Agenda', icon: '☐' },
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
 
 /*
- * Tab ✓ completion rules (v10):
- * - Today:      day closed OR all morning+night checks graded (no PENDING)
- * - Follow-ups: tended if zero overdue (does NOT block Close day)
- * - Progress:   today’s weight logged (morning weigh-in done)
- * - Weekly:     ≥3 days in the current Mon–Sun week have any Pass/Fail grades
- * Weather is NOT a Pass/Fail check. Follow-ups never block Close day.
+ * Tab ✓ completion rules (v11):
+ * - Today:   day closed OR all morning+night checks graded (no PENDING)
+ * - Progress: today’s weight logged (morning weigh-in done)
+ * - Agenda:  tended if zero overdue (does NOT block Close day)
+ * Weather is NOT a Pass/Fail check. Agenda never blocks Close day.
  */
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
@@ -288,9 +284,6 @@ function TodayView({
   ny,
   todayKey,
   weather,
-  followups,
-  onOpenFollowups,
-  onAddFollowup,
 }) {
   const { todayWeight, setTodayWeight } = useWeight(todayKey);
   const activePart = activePeriodId(ny.hour);
@@ -325,17 +318,6 @@ function TodayView({
         morningBrief={weather.morningBrief}
         refresh={weather.refresh}
       />
-
-      {followups.showStrip && (
-        <FollowupsStrip
-          items={followups.stripItems}
-          todayKey={todayKey}
-          overdueCount={followups.overdueCount}
-          onToggle={followups.toggle}
-          onOpenFollowups={onOpenFollowups}
-          onAdd={onAddFollowup}
-        />
-      )}
 
       {todayStats.showResults && (
         <>
@@ -584,171 +566,7 @@ function ProgressView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v10</p>
-      </footer>
-    </div>
-  );
-}
-
-function WeeklyView({ days, weekStrip, weekPcts, todayKey, todayPct }) {
-  const { weights } = useWeight(todayKey);
-
-  const weekDays = useMemo(
-    () =>
-      weekStrip.map((d) => {
-        const day = days[d.key];
-        const pct = d.key === todayKey ? todayPct : weekPcts[d.key] ?? null;
-        return {
-          key: d.key,
-          dow: d.dow,
-          today: d.today,
-          checks: day?.checks || {},
-          pct,
-          closed: Boolean(day?.closed),
-        };
-      }),
-    [weekStrip, days, weekPcts, todayKey, todayPct],
-  );
-
-  const report = useMemo(
-    () => buildWeeklyReport(weekDays, { weights }),
-    [weekDays, weights],
-  );
-
-  const avgTone =
-    report.avg == null
-      ? 'muted'
-      : report.avg >= 80
-        ? 'hot'
-        : report.avg >= 50
-          ? 'mid'
-          : 'cold';
-
-  return (
-    <div className="view weekly-view">
-      <header className="progress-header">
-        <h1>Weekly</h1>
-        <p className="date-line">The harder mirror · no flattery</p>
-      </header>
-
-      <section className="card honesty-card">
-        <div className="card-head">
-          <h2>Week performance</h2>
-          <span className="card-sub">
-            {report.gradedCount
-              ? `${report.gradedCount} graded · Mon–Sun`
-              : 'No graded days yet'}
-          </span>
-        </div>
-        <div className={`honesty-score tone-${avgTone}`}>
-          {report.avg == null ? '—' : `${report.avg}%`}
-        </div>
-        <p className="honesty-line">
-          Morning {report.morningRate == null ? '—' : `${report.morningRate}%`}
-          {' · '}
-          Night {report.nightRate == null ? '—' : `${report.nightRate}%`}
-        </p>
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Day strip</h2>
-          <span className="card-sub">This week</span>
-        </div>
-        <div className="week-strip" role="list">
-          {weekDays.map((d) => (
-            <div
-              key={d.key}
-              className={`day-cell ${d.today ? 'today' : ''} ${d.pct == null ? 'empty' : ''}`}
-              role="listitem"
-            >
-              <span className="dow">{d.dow}</span>
-              <span className="day-pct">
-                {d.pct == null ? '—' : `${d.pct}%`}
-              </span>
-              <span
-                className={`day-bar ${
-                  d.pct == null
-                    ? 'none'
-                    : d.pct >= 80
-                      ? 'hot'
-                      : d.pct >= 50
-                        ? 'mid'
-                        : 'cold'
-                }`}
-                style={{
-                  height: d.pct == null ? 4 : Math.max(8, (d.pct / 100) * 48),
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {report.patterns.length > 0 && (
-        <section className="card">
-          <div className="card-head">
-            <h2>Streak / miss patterns</h2>
-            <span className="card-sub">From Pass/Fail</span>
-          </div>
-          <ul className="pattern-list">
-            {report.patterns.map((p) => (
-              <li key={p.id} className={`pattern ${p.kind}`}>
-                <strong>{p.label}</strong>
-                <span>{p.detail}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Weight</h2>
-          <span className="card-sub">This week</span>
-        </div>
-        <div className="metric-grid single">
-          <div className="metric-tile">
-            <span className="metric-kicker">Trend</span>
-            <strong className="mono">
-              {report.weightTrend
-                ? report.weightTrend.count === 1
-                  ? `${report.weightTrend.last} lbs`
-                  : `${report.weightTrend.first} → ${report.weightTrend.last}`
-                : '—'}
-            </strong>
-            <span className="metric-sub">
-              {report.weightTrend
-                ? report.weightTrend.count < 2
-                  ? 'Need more mornings'
-                  : report.weightTrend.delta === 0
-                    ? 'Flat'
-                    : report.weightTrend.delta < 0
-                      ? `Down ${Math.abs(report.weightTrend.delta)} lbs`
-                      : `Up ${report.weightTrend.delta} lbs`
-                : 'No logs this week'}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="card truth-card">
-        <div className="card-head">
-          <h2>Uncomfortable truth</h2>
-          <span className="card-sub">Health · Faith · Family · Discipline</span>
-        </div>
-        <ul className="truth-list">
-          {report.truths.map((t) => (
-            <li key={`${t.theme}-${t.line.slice(0, 32)}`}>
-              <span className="truth-theme">{t.theme}</span>
-              <p>{t.line}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <footer className="mos-footer">
-        <p>Manuel OS · weekly mirror · v10</p>
+        <p>Manuel OS · local only · v11</p>
       </footer>
     </div>
   );
@@ -764,45 +582,33 @@ export default function App() {
     weekPcts,
     weekStrip,
     weekHonesty,
-    weekDaysWithGrades,
     ny,
     setStatus,
     closeDay,
   } = useCheckins();
   const { todayWeight } = useWeight(todayKey);
   const weather = useWeather(ny.hour);
-  const followups = useFollowups(todayKey);
+  const agenda = useAgenda(todayKey);
   const [tab, setTab] = useState('today');
   const [focusComposer, setFocusComposer] = useState(false);
 
   useEffect(() => {
-    if (tab !== 'followups') setFocusComposer(false);
+    if (tab !== 'agenda') setFocusComposer(false);
   }, [tab]);
 
   /*
    * Tab ✓ rules (see top-of-file comment):
-   * Today      → closed OR all checks graded
-   * Follow-ups → zero overdue (never blocks Close day)
-   * Progress   → weight logged today
-   * Weekly     → ≥3 days this week have any grades
+   * Today    → closed OR all checks graded
+   * Progress → weight logged today
+   * Agenda   → zero overdue (never blocks Close day)
    */
   const tabDone = {
     today: Boolean(today?.closed) || Boolean(todayStats?.allGraded),
-    followups: followups.tended,
     progress:
       todayWeight !== '' &&
       todayWeight != null &&
       Number.isFinite(Number(todayWeight)),
-    weekly: weekDaysWithGrades >= 3,
-  };
-
-  const openFollowups = () => {
-    setFocusComposer(false);
-    setTab('followups');
-  };
-  const addFollowupJump = () => {
-    setTab('followups');
-    setFocusComposer(true);
+    agenda: agenda.tended,
   };
 
   if (!today) {
@@ -829,21 +635,6 @@ export default function App() {
               ny={ny}
               todayKey={todayKey}
               weather={weather}
-              followups={followups}
-              onOpenFollowups={openFollowups}
-              onAddFollowup={addFollowupJump}
-            />
-          )}
-          {tab === 'followups' && (
-            <FollowupsView
-              todayKey={todayKey}
-              groups={followups.groups}
-              counts={followups.counts}
-              add={followups.add}
-              toggle={followups.toggle}
-              remove={followups.remove}
-              rename={followups.rename}
-              focusComposer={focusComposer}
             />
           )}
           {tab === 'progress' && (
@@ -856,19 +647,25 @@ export default function App() {
               todayKey={todayKey}
             />
           )}
-          {tab === 'weekly' && (
-            <WeeklyView
-              days={days}
-              weekStrip={weekStrip}
-              weekPcts={weekPcts}
+          {tab === 'agenda' && (
+            <AgendaView
               todayKey={todayKey}
-              todayPct={todayPct}
+              overdue={agenda.overdue}
+              counts={agenda.counts}
+              itemsForDate={agenda.itemsForDate}
+              itemsForWeekDay={agenda.itemsForWeekDay}
+              monthQueue={agenda.monthQueue}
+              add={agenda.add}
+              toggle={agenda.toggle}
+              remove={agenda.remove}
+              rename={agenda.rename}
+              focusComposer={focusComposer}
             />
           )}
         </main>
       </div>
 
-      <nav className="bottom-nav tabs-4" aria-label="Main">
+      <nav className="bottom-nav tabs-3" aria-label="Main">
         {NAV.map((n) => (
           <button
             key={n.id}
