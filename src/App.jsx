@@ -317,7 +317,6 @@ function TodayView({
       </header>
 
       <WeatherCard
-        loc={weather.loc}
         locId={weather.locId}
         setLocId={weather.setLocId}
         data={weather.data}

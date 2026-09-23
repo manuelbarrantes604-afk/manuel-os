@@ -1,7 +1,6 @@
 import { WEATHER_LOCS } from '../hooks/useWeather';
 
 export default function WeatherCard({
-  loc,
   locId,
   setLocId,
   data,
