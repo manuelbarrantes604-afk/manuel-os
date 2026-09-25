@@ -2739,3 +2739,220 @@
   background: linear-gradient(180deg, var(--surface) 0%, #f7f1e6 100%);
   border-color: rgba(180, 140, 90, 0.18);
 }
+
+/* —— v17: Day|Week tabs, move-to-day, habit scoreboard —— */
+.notes-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.notes-mode-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--muted);
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.notes-mode-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.notes-day-strip.move-ready {
+  outline: 2px solid rgba(22, 163, 74, 0.28);
+  outline-offset: 2px;
+  border-radius: 14px;
+  background: rgba(22, 163, 74, 0.04);
+  padding: 4px;
+}
+
+.notes-day-chip.drop-lit {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.35);
+  color: var(--text);
+}
+
+.notes-move-hint {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--green-dark);
+}
+
+.note-move {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  min-height: 36px;
+  min-width: 52px;
+}
+
+.note-move.active {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.35);
+  color: var(--green-dark);
+}
+
+.note-row.moving {
+  border-color: rgba(22, 163, 74, 0.35);
+  background: #fbfaf4;
+}
+
+.note-row.compact {
+  min-height: 44px;
+  padding: 6px 6px;
+}
+
+.notes-week-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-week-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px 10px;
+}
+
+.notes-week-day.is-today {
+  border-color: rgba(22, 163, 74, 0.22);
+}
+
+.notes-week-day.is-selected {
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.12);
+}
+
+.notes-week-day-head {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.notes-week-day-head strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.notes-week-day-date {
+  font-weight: 550;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.notes-week-empty {
+  margin: 0;
+  padding: 2px 4px 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.habit-scoreboard {
+  background: linear-gradient(180deg, var(--surface) 0%, #f7f1e6 100%);
+  border-color: rgba(180, 140, 90, 0.18);
+}
+
+.habit-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.habit-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+}
+
+.habit-score .streak-flame {
+  color: var(--amber);
+  font-size: 1.1rem;
+  margin-bottom: 2px;
+}
+
+.habit-score strong {
+  font-family: var(--mono);
+  font-size: 1.45rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.habit-score strong.tone-hot {
+  color: var(--green-dark);
+}
+
+.habit-score strong.tone-mid {
+  color: var(--amber);
+}
+
+.habit-score strong.tone-cold {
+  color: var(--danger);
+}
+
+.habit-score strong.tone-muted {
+  color: var(--muted);
+}
+
+.habit-score span {
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.habit-earn-line {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+.progress-view .week-weight-card {
+  opacity: 0.98;
+}
+
+.progress-view .week-weight-card .card-head h2 {
+  font-size: 0.95rem;
+}

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CHECK_DEFS, DAY_PARTS, GOALS, IMPROVE_TIPS } from './data/seed';
+import { useEffect, useState } from 'react';
+import { CHECK_DEFS, DAY_PARTS, IMPROVE_TIPS } from './data/seed';
 import WeatherCard from './components/WeatherCard';
 import AgendaView from './components/AgendaView';
 import { useCheckins } from './hooks/useCheckins';
@@ -417,15 +417,7 @@ function WeekWeightCard({ weekWeight }) {
   );
 }
 
-function ProgressView({ weekHonesty, days, todayKey, weekWeight, streak }) {
-  const latestReview = useMemo(() => {
-    const keys = Object.keys(days).sort().reverse();
-    for (const k of keys) {
-      if (days[k]?.review?.ran) return days[k];
-    }
-    return days[todayKey] || null;
-  }, [days, todayKey]);
-
+function ProgressView({ weekHonesty, weekWeight, streak }) {
   const honestyTone =
     weekHonesty.avg == null
       ? 'muted'
@@ -435,97 +427,39 @@ function ProgressView({ weekHonesty, days, todayKey, weekWeight, streak }) {
           ? 'mid'
           : 'cold';
 
+  const stick =
+    weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`;
+
   return (
     <div className="view progress-view">
       <header className="progress-header">
         <div className="greeting-row">
           <div>
             <h1>Progress</h1>
-            <p className="date-line">Streak · honesty · weight</p>
+            <p className="date-line">Stay consistent · habit scoreboard</p>
           </div>
-          <span className="xp-chip" title="Lifetime XP from Pass grades">
-            Lv {streak.level} · {streak.xp} XP
-          </span>
         </div>
       </header>
 
-      <section className="card streak-hero" aria-label="Your streak">
-        <div className="streak-hero-top">
-          <FlameIcon className="streak-flame streak-flame-lg" />
-          <div className="streak-hero-num">{streak.current}</div>
-          <p className="streak-hero-label">Day streak</p>
-        </div>
-        <div className="streak-hero-stats">
-          <div className="streak-stat">
+      <section className="card habit-scoreboard" aria-label="Habit consistency">
+        <div className="habit-score-grid">
+          <div className="habit-score">
+            <FlameIcon className="streak-flame" />
+            <strong>{streak.current}</strong>
+            <span>Current streak</span>
+          </div>
+          <div className="habit-score">
             <strong>{streak.longest}</strong>
-            <span>Longest streak</span>
+            <span>Longest</span>
           </div>
-          <div className="streak-stat-divider" aria-hidden="true" />
-          <div className="streak-stat">
-            <strong>{streak.lastActivityLabel}</strong>
-            <span>Last activity</span>
+          <div className="habit-score">
+            <strong className={`tone-${honestyTone}`}>{stick}</strong>
+            <span>Week stick</span>
           </div>
         </div>
-      </section>
-
-      <section className="card streak-rules-card">
-        <div className="card-head">
-          <h2>Streak</h2>
-        </div>
-        <ul className="streak-rules-list">
-          <li>
-            <span className="streak-rule-mark" aria-hidden="true">
-              ✓
-            </span>
-            <span>Wake 5:00</span>
-          </li>
-          <li>
-            <span className="streak-rule-mark" aria-hidden="true">
-              ✓
-            </span>
-            <span>Leave 5:30</span>
-          </li>
-          <li>
-            <span className="streak-rule-mark" aria-hidden="true">
-              ✓
-            </span>
-            <span>Exercise 6:00</span>
-          </li>
-        </ul>
-        <p className="streak-rules-copy">All three Pass. Miss resets to 0.</p>
-      </section>
-
-      <section className="card honesty-card">
-        <div className="card-head">
-          <h2>Week honesty</h2>
-          <span className={`honesty-score tone-${honestyTone}`}>
-            {weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`}
-          </span>
-        </div>
-        <p className="honesty-line">{weekHonesty.line}</p>
-      </section>
-
-      <WeekWeightCard weekWeight={weekWeight} />
-
-      <section className="card goals-card">
-        <div className="card-head">
-          <h2>Goals</h2>
-          <span className="card-sub">North stars</span>
-        </div>
-        <ul className="goal-list">
-          {GOALS.map((g) => (
-            <li key={g.id} className="goal-row">
-              <div className="goal-copy">
-                <strong>{g.title}</strong>
-                <span>{g.meta}</span>
-              </div>
-              <span className="goal-pct">{g.progress}%</span>
-              <div className="goal-meter" aria-hidden="true">
-                <div className="goal-fill" style={{ width: `${g.progress}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <p className="habit-earn-line">
+          Streak = wake + leave + exercise Pass. Miss resets to 0.
+        </p>
       </section>
 
       <section className="card streak-cal-card" aria-label="Last 14 days">
@@ -551,23 +485,10 @@ function ProgressView({ weekHonesty, days, todayKey, weekWeight, streak }) {
         </div>
       </section>
 
-      {latestReview?.review?.ran && (
-        <section className="card review-simple">
-          <div className="card-head">
-            <h2>Latest review</h2>
-            <span className="card-sub">
-              {latestReview.label}
-              {latestReview.review.score != null
-                ? ` · ${latestReview.review.score}%`
-                : ''}
-            </span>
-          </div>
-          <p className="review-body">{latestReview.review.body}</p>
-        </section>
-      )}
+      <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v16</p>
+        <p>Manuel OS · local · v17</p>
       </footer>
     </div>
   );
@@ -633,8 +554,6 @@ export default function App() {
           {tab === 'progress' && (
             <ProgressView
               weekHonesty={weekHonesty}
-              days={days}
-              todayKey={todayKey}
               weekWeight={weekWeight}
               streak={streak}
             />
