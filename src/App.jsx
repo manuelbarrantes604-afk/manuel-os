@@ -417,7 +417,19 @@ function WeekWeightCard({ weekWeight }) {
   );
 }
 
-function ProgressView({ weekHonesty, weekWeight, streak }) {
+function shortHabitLabel(label) {
+  const map = {
+    'Wake 5:00': 'Wake',
+    'Leave 5:30': 'Leave',
+    'Exercise 6:00': 'Exercise',
+    '1hr AI': 'AI hour',
+    'Cal AI review': 'Cal AI',
+    'Family time': 'Family',
+  };
+  return map[label] || label;
+}
+
+function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
   const honestyTone =
     weekHonesty.avg == null
       ? 'muted'
@@ -430,6 +442,30 @@ function ProgressView({ weekHonesty, weekWeight, streak }) {
   const stick =
     weekHonesty.avg == null ? '—' : `${weekHonesty.avg}%`;
 
+  const rates = habitInsights?.thisRates || [];
+  const compareLine = (() => {
+    const a = habitInsights?.thisAvg;
+    const b = habitInsights?.lastAvg;
+    if (a == null && b == null) return null;
+    if (a == null) return `Last week stick ${b}% · this week still opening`;
+    if (b == null) return `This week stick ${a}% · no graded days last week`;
+    const delta = a - b;
+    if (delta === 0) return `This week ${a}% · even with last week`;
+    if (delta > 0) return `This week ${a}% · +${delta} vs last week`;
+    return `This week ${a}% · ${delta} vs last week`;
+  })();
+
+  const patternLine = (() => {
+    const best = habitInsights?.best;
+    const worst = habitInsights?.worst;
+    if (!best || !worst || best.key === worst.key) return null;
+    const fmt = (key) => {
+      const [, m, d] = key.split('-');
+      return `${Number(m)}/${Number(d)}`;
+    };
+    return `Best ${fmt(best.key)} (${best.pct}%) · softest ${fmt(worst.key)} (${worst.pct}%)`;
+  })();
+
   return (
     <div className="view progress-view">
       <header className="progress-header">
@@ -438,6 +474,9 @@ function ProgressView({ weekHonesty, weekWeight, streak }) {
             <h1>Progress</h1>
             <p className="date-line">Stay consistent · habit scoreboard</p>
           </div>
+          <span className="xp-chip" title="Lifetime XP from Pass grades">
+            Lv {streak.level} · {streak.xp} XP
+          </span>
         </div>
       </header>
 
@@ -475,6 +514,7 @@ function ProgressView({ weekHonesty, weekWeight, streak }) {
               title={`${d.key}${d.earned ? ' · earned' : ' · miss'}`}
             >
               <span className="streak-cal-dow">{d.dow}</span>
+              <span className="streak-cal-num">{d.dayNum}</span>
               {d.earned ? (
                 <FlameIcon className="streak-flame streak-flame-sm" />
               ) : (
@@ -485,10 +525,51 @@ function ProgressView({ weekHonesty, weekWeight, streak }) {
         </div>
       </section>
 
+      {rates.some((r) => r.graded > 0) ? (
+        <section className="card" aria-label="Habit stick rates">
+          <div className="card-head">
+            <h2>This week by habit</h2>
+            <span className="card-sub">Stick %</span>
+          </div>
+          <div className="habit-rates">
+            {rates.map((r) => {
+              const tone =
+                r.pct == null ? '' : r.pct >= 80 ? '' : r.pct >= 50 ? 'mid' : 'cold';
+              return (
+                <div key={r.id} className="habit-rate-row">
+                  <span className="habit-rate-label">{shortHabitLabel(r.label)}</span>
+                  <span className="habit-rate-meta">
+                    {r.pct == null ? '—' : `${r.pct}%`}
+                  </span>
+                  <div className="habit-rate-track" aria-hidden="true">
+                    <div
+                      className={`habit-rate-fill ${tone}`}
+                      style={{ width: `${r.pct ?? 0}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {compareLine || patternLine || habitInsights?.tip ? (
+        <section className="card" aria-label="Consistency notes">
+          <div className="card-head">
+            <h2>Consistency</h2>
+            <span className="card-sub">Signals</span>
+          </div>
+          {compareLine ? <p className="habit-compare">{compareLine}</p> : null}
+          {patternLine ? <p className="habit-compare">{patternLine}</p> : null}
+          {habitInsights?.tip ? <p className="habit-tip">{habitInsights.tip}</p> : null}
+        </section>
+      ) : null}
+
       <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v18</p>
+        <p>Manuel OS · local · v19</p>
       </footer>
     </div>
   );
@@ -502,6 +583,7 @@ export default function App() {
     todayPct,
     todayStats,
     weekHonesty,
+    habitInsights,
     ny,
     setStatus,
     closeDay,
@@ -556,6 +638,7 @@ export default function App() {
               weekHonesty={weekHonesty}
               weekWeight={weekWeight}
               streak={streak}
+              habitInsights={habitInsights}
             />
           )}
           {tab === 'agenda' && (

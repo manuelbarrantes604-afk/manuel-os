@@ -102,6 +102,37 @@ function dayHasAnyGrade(day) {
   });
 }
 
+
+function shiftKey(dateKey, delta) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Per-habit stick rates for a list of day keys. */
+function habitRatesFor(days, keys) {
+  return CHECK_DEFS.map((def) => {
+    let graded = 0;
+    let pass = 0;
+    for (const key of keys) {
+      const st = days[key]?.checks?.[def.id]?.status;
+      if (st === 'PASS' || st === 'FAIL') {
+        graded += 1;
+        if (st === 'PASS') pass += 1;
+      }
+    }
+    const pct = graded ? Math.round((pass / graded) * 100) : null;
+    return {
+      id: def.id,
+      label: def.label,
+      pass,
+      graded,
+      pct,
+    };
+  });
+}
+
 export function useCheckins() {
   const ny = useMemo(() => getNyParts(), []);
   const todayKey = ny.dateKey;
@@ -224,6 +255,60 @@ export function useCheckins() {
     return weekStrip.filter((d) => dayHasAnyGrade(days[d.key])).length;
   }, [weekStrip, days]);
 
+  const habitInsights = useMemo(() => {
+    const thisKeys = weekStrip.map((d) => d.key);
+    const lastKeys = thisKeys.map((k) => shiftKey(k, -7));
+    const thisRates = habitRatesFor(days, thisKeys);
+    const lastRates = habitRatesFor(days, lastKeys);
+    const thisAvg =
+      thisRates.filter((r) => r.pct != null).length === 0
+        ? null
+        : Math.round(
+            thisRates.filter((r) => r.pct != null).reduce((s, r) => s + r.pct, 0) /
+              thisRates.filter((r) => r.pct != null).length,
+          );
+    const lastAvg =
+      lastRates.filter((r) => r.pct != null).length === 0
+        ? null
+        : Math.round(
+            lastRates.filter((r) => r.pct != null).reduce((s, r) => s + r.pct, 0) /
+              lastRates.filter((r) => r.pct != null).length,
+          );
+
+    // Best / worst graded day this week by pass count
+    let best = null;
+    let worst = null;
+    for (const key of thisKeys) {
+      const day = days[key];
+      if (!dayHasAnyGrade(day)) continue;
+      const stats = calcDayStats(day.checks, day.closed);
+      const row = { key, pct: stats.pct, passCount: stats.passCount };
+      if (!best || row.pct > best.pct) best = row;
+      if (!worst || row.pct < worst.pct) worst = row;
+    }
+
+    let tip = null;
+    const weak = [...thisRates]
+      .filter((r) => r.graded > 0)
+      .sort((a, b) => (a.pct ?? 100) - (b.pct ?? 100))[0];
+    if (weak && weak.pct != null && weak.pct < 70) {
+      tip = `Weakest this week: ${weak.label} (${weak.pct}%). Protect it tomorrow.`;
+    } else if (thisAvg != null && lastAvg != null && thisAvg < lastAvg - 5) {
+      tip = `This week is ${lastAvg - thisAvg}pts below last. Rebuild the morning stack.`;
+    } else if (thisAvg != null && thisAvg >= 80) {
+      tip = 'Solid stick this week. Keep the morning stack intact.';
+    }
+
+    return {
+      thisRates,
+      thisAvg,
+      lastAvg,
+      best,
+      worst,
+      tip,
+    };
+  }, [days, weekStrip]);
+
   return {
     days,
     today,
@@ -234,6 +319,7 @@ export function useCheckins() {
     weekStrip,
     weekHonesty,
     weekDaysWithGrades,
+    habitInsights,
     ny,
     setStatus,
     closeDay,

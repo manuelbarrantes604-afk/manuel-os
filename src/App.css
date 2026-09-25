@@ -586,11 +586,9 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -2751,6 +2749,10 @@
   border-radius: 12px;
 }
 
+.notes-mode-tabs.tabs-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .notes-mode-tab {
   appearance: none;
   border: 0;
@@ -2957,28 +2959,91 @@
   font-size: 0.95rem;
 }
 
-/* —— v18: Apple Notes–style sheet, contextual Move|Remove, undo toast —— */
+/* —— v19: sheet portal, undo bar, month grid, week/month nav —— */
+.notes-undo-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .notes-undo-btn {
   appearance: none;
   border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-soft);
+  background: var(--surface);
+  color: var(--muted);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 650;
-  padding: 8px 12px;
-  border-radius: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
   cursor: pointer;
-  min-height: 42px;
+  min-height: 44px;
+}
+
+.notes-undo-btn.ready {
+  color: var(--text);
+  border-color: rgba(22, 163, 74, 0.28);
+  background: rgba(22, 163, 74, 0.06);
 }
 
 .notes-undo-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
 .notes-undo-btn:not(:disabled):active {
   transform: scale(0.98);
+}
+
+.notes-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notes-nav-chrome {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 6px;
+}
+
+.notes-nav-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  width: 44px;
+  height: 40px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.notes-nav-btn:active {
+  transform: scale(0.97);
+}
+
+.notes-nav-label {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text);
+  text-align: center;
+  padding: 8px 4px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.notes-nav-label:active {
+  background: var(--surface-2);
 }
 
 .notes-move-hint.soft {
@@ -2992,40 +3057,58 @@
 .note-row .note-title-btn {
   flex: 1;
   min-width: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
+.note-row .note-check {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Sheet portaled to body — above bottom nav, clears safe area */
 .note-sheet-root {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 200;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .note-sheet-backdrop {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(40, 32, 22, 0.28);
+  background: rgba(40, 32, 22, 0.32);
   cursor: pointer;
-  pointer-events: auto;
 }
 
 .note-sheet {
   position: relative;
   width: min(420px, 100%);
-  margin: 0 10px 18px;
+  margin: 0 10px calc(78px + env(safe-area-inset-bottom, 0px));
   padding: 10px 14px 14px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(40, 32, 22, 0.18);
-  pointer-events: auto;
+  box-shadow: 0 12px 40px rgba(40, 32, 22, 0.2);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: sheet-up 0.22s ease both;
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .note-sheet-handle {
@@ -3112,9 +3195,9 @@
 .notes-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  z-index: 90;
+  z-index: 210;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3138,6 +3221,7 @@
   font-weight: 750;
   cursor: pointer;
   padding: 4px 6px;
+  min-height: 36px;
 }
 
 .notes-toast-dismiss {
@@ -3149,4 +3233,173 @@
   line-height: 1;
   cursor: pointer;
   padding: 2px 4px;
+}
+
+/* Month calendar */
+.notes-month-card {
+  padding: 12px 10px 10px;
+}
+
+.notes-month-dows {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.notes-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.notes-month-cell {
+  appearance: none;
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  border-radius: 12px;
+  min-height: 48px;
+  padding: 6px 2px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+
+.notes-month-cell.out {
+  opacity: 0.35;
+}
+
+.notes-month-cell.is-today {
+  border-color: rgba(22, 163, 74, 0.28);
+}
+
+.notes-month-cell.active {
+  background: var(--surface);
+  border-color: rgba(22, 163, 74, 0.4);
+  box-shadow: var(--shadow);
+}
+
+.notes-month-cell.has-notes .notes-month-num {
+  font-weight: 750;
+}
+
+.notes-month-num {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.notes-month-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.notes-month-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Progress habit extras */
+.habit-xp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--text-soft);
+}
+
+.habit-rates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.habit-rate-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.habit-rate-label {
+  font-size: 0.84rem;
+  font-weight: 550;
+  color: var(--text);
+}
+
+.habit-rate-meta {
+  font-size: 0.78rem;
+  font-weight: 650;
+  font-family: var(--mono);
+  color: var(--text-soft);
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.habit-rate-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.habit-rate-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.55);
+}
+
+.habit-rate-fill.mid {
+  background: rgba(202, 138, 4, 0.55);
+}
+
+.habit-rate-fill.cold {
+  background: rgba(220, 38, 38, 0.45);
+}
+
+.habit-compare {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.habit-tip {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.streak-cal-cell .streak-cal-num {
+  font-size: 0.62rem;
+  font-weight: 650;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.streak-cal-cell.earned .streak-cal-num {
+  color: var(--green-dark);
 }

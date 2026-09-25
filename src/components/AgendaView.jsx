@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatAgendaDayParts, weekStripFor } from '../lib/time';
-import { weekRangeLabel } from '../hooks/useAgenda';
+import { addDays, monthLabel, weekRangeLabel } from '../hooks/useAgenda';
 
 const SpeechRecognitionAPI =
   typeof window !== 'undefined'
@@ -9,16 +10,95 @@ const SpeechRecognitionAPI =
 
 const UNDO_LIMIT = 20;
 const TOAST_MS = 4500;
+const MONTH_NAMES_SHORT = [
+  '',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
-function NoteRow({ item, onToggle, onOpen, moving, compact }) {
+function weekRangePretty(weekDays) {
+  if (!weekDays?.length) return '';
+  const first = weekDays[0].key;
+  const last = weekDays[6].key;
+  const [, m1, d1] = first.split('-').map(Number);
+  const [, m2, d2] = last.split('-').map(Number);
+  if (m1 === m2) return `${MONTH_NAMES_SHORT[m1]} ${d1}–${d2}`;
+  return `${MONTH_NAMES_SHORT[m1]} ${d1}–${MONTH_NAMES_SHORT[m2]} ${d2}`;
+}
+
+function daysInMonth(year, month /* 1-12 */) {
+  return new Date(Date.UTC(year, month, 0, 12)).getUTCDate();
+}
+
+/** Calendar cells for a month (Mon-first), including leading/trailing padding. */
+function monthGrid(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const dim = daysInMonth(y, m);
+  const firstKey = `${ym}-01`;
+  const strip = weekStripFor(firstKey);
+  const mondayOfFirst = strip[0].key;
+  // How many leading days before the 1st?
+  const lead = (() => {
+    const [fy, fm, fd] = firstKey.split('-').map(Number);
+    const noon = new Date(Date.UTC(fy, fm - 1, fd, 12));
+    const dow = noon.getUTCDay(); // 0 Sun
+    return dow === 0 ? 6 : dow - 1;
+  })();
+  const cells = [];
+  // Leading from previous month
+  for (let i = lead; i > 0; i -= 1) {
+    const key = addDays(firstKey, -i);
+    cells.push({ key, inMonth: false, dayNum: Number(key.slice(8)) });
+  }
+  for (let d = 1; d <= dim; d += 1) {
+    const key = `${ym}-${String(d).padStart(2, '0')}`;
+    cells.push({ key, inMonth: true, dayNum: d });
+  }
+  // Trailing to complete weeks
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].key;
+    const key = addDays(last, 1);
+    cells.push({ key, inMonth: false, dayNum: Number(key.slice(8)) });
+  }
+  return { cells, mondayOfFirst, ym };
+}
+
+function useFinePointer() {
+  const [fine, setFine] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(pointer: fine)');
+    const sync = () => setFine(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
+  return fine;
+}
+
+function NoteRow({ item, onToggle, onOpen, moving, compact, canDrag }) {
   return (
     <li
       className={`note-row ${item.done ? 'done' : ''} ${moving ? 'moving' : ''} ${compact ? 'compact' : ''}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', item.id);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
+      draggable={canDrag}
+      onDragStart={
+        canDrag
+          ? (e) => {
+              e.dataTransfer.setData('text/plain', item.id);
+              e.dataTransfer.effectAllowed = 'move';
+            }
+          : undefined
+      }
     >
       <button
         type="button"
@@ -27,15 +107,20 @@ function NoteRow({ item, onToggle, onOpen, moving, compact }) {
         aria-pressed={item.done}
         onClick={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           onToggle(item.id);
         }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {item.done ? '✓' : ''}
       </button>
       <button
         type="button"
         className="note-title-btn"
-        onClick={() => onOpen(item)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(item);
+        }}
       >
         {item.title}
       </button>
@@ -133,6 +218,18 @@ function NoteSheet({
     return () => cancelAnimationFrame(t);
   }, [item?.id]);
 
+  useEffect(() => {
+    if (!item) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, onClose]);
+
   if (!item) return null;
 
   const parts = formatAgendaDayParts(item.due || todayKey);
@@ -143,7 +240,7 @@ function NoteSheet({
     onClose();
   };
 
-  return (
+  const node = (
     <div className="note-sheet-root" role="presentation">
       <button
         type="button"
@@ -199,11 +296,13 @@ function NoteSheet({
       </div>
     </div>
   );
+
+  return createPortal(node, document.body);
 }
 
 function UndoToast({ toast, onUndo, onDismiss }) {
   if (!toast) return null;
-  return (
+  const node = (
     <div className="notes-toast" role="status" aria-live="polite">
       <span>{toast.message}</span>
       {toast.canUndo ? (
@@ -218,6 +317,28 @@ function UndoToast({ toast, onUndo, onDismiss }) {
         onClick={onDismiss}
       >
         ×
+      </button>
+    </div>
+  );
+  return createPortal(node, document.body);
+}
+
+function NavChrome({ label, onPrev, onNext, onToday }) {
+  return (
+    <div className="notes-nav-chrome" role="group" aria-label="Navigate">
+      <button type="button" className="notes-nav-btn" onClick={onPrev} aria-label="Previous">
+        ‹
+      </button>
+      <button
+        type="button"
+        className="notes-nav-label"
+        onClick={onToday}
+        title="Jump to today"
+      >
+        {label}
+      </button>
+      <button type="button" className="notes-nav-btn" onClick={onNext} aria-label="Next">
+        ›
       </button>
     </div>
   );
@@ -240,6 +361,7 @@ export default function AgendaView({
 }) {
   const [mode, setMode] = useState('day');
   const [selectedDay, setSelectedDay] = useState(todayKey);
+  const [anchorKey, setAnchorKey] = useState(todayKey);
   const [title, setTitle] = useState('');
   const [listening, setListening] = useState(false);
   const [movingId, setMovingId] = useState(null);
@@ -252,11 +374,25 @@ export default function AgendaView({
   const recognitionRef = useRef(null);
   const toastTimer = useRef(null);
   const cacheRef = useRef(new Map());
+  const undoRef = useRef([]);
+  const redoRef = useRef([]);
   const speechSupported = Boolean(SpeechRecognitionAPI);
+  const canDrag = useFinePointer();
 
-  const week = useMemo(() => weekStripFor(todayKey), [todayKey]);
+  useEffect(() => {
+    undoRef.current = undoStack;
+  }, [undoStack]);
+  useEffect(() => {
+    redoRef.current = redoStack;
+  }, [redoStack]);
+
+  const week = useMemo(() => weekStripFor(selectedDay), [selectedDay]);
   const weekKeys = useMemo(() => week.map((d) => d.key), [week]);
-  const weekLabel = useMemo(() => weekRangeLabel(week), [week]);
+  const weekLabel = useMemo(() => weekRangePretty(week) || weekRangeLabel(week), [week]);
+
+  const monthYm = useMemo(() => anchorKey.slice(0, 7), [anchorKey]);
+  const monthTitle = useMemo(() => monthLabel(monthYm), [monthYm]);
+  const grid = useMemo(() => monthGrid(monthYm), [monthYm]);
 
   const remember = (it) => {
     if (it?.id) cacheRef.current.set(it.id, { ...it });
@@ -266,6 +402,7 @@ export default function AgendaView({
 
   useEffect(() => {
     setSelectedDay(todayKey);
+    setAnchorKey(todayKey);
   }, [todayKey]);
 
   useEffect(() => {
@@ -288,6 +425,16 @@ export default function AgendaView({
     };
   }, []);
 
+  // Lock body scroll while sheet is open (phone)
+  useEffect(() => {
+    if (!sheetItem) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sheetItem]);
+
   const dayItems = useMemo(() => {
     const list = itemsForDate(selectedDay) || [];
     if (selectedDay === todayKey && overdue?.length) {
@@ -303,9 +450,11 @@ export default function AgendaView({
   }, [dayItems]);
 
   const weekSections = useMemo(() => {
-    return week.map((d) => {
+    const strip = weekStripFor(anchorKey);
+    const keys = strip.map((d) => d.key);
+    return strip.map((d) => {
       const items = itemsForWeekDay
-        ? itemsForWeekDay(d.key, weekKeys)
+        ? itemsForWeekDay(d.key, keys)
         : itemsForDate(d.key) || [];
       const dayParts = formatAgendaDayParts(d.key);
       return {
@@ -316,7 +465,7 @@ export default function AgendaView({
         openCount: items.filter((i) => !i.done).length,
       };
     });
-  }, [week, weekKeys, itemsForWeekDay, itemsForDate, todayKey]);
+  }, [anchorKey, itemsForWeekDay, itemsForDate, todayKey]);
 
   useEffect(() => {
     for (const sec of weekSections) {
@@ -335,8 +484,15 @@ export default function AgendaView({
   };
 
   const pushUndo = (entry) => {
-    setUndoStack((prev) => [...prev.slice(-(UNDO_LIMIT - 1)), entry]);
-    setRedoStack([]);
+    setUndoStack((prev) => {
+      const next = [...prev.slice(-(UNDO_LIMIT - 1)), entry];
+      undoRef.current = next;
+      return next;
+    });
+    setRedoStack(() => {
+      redoRef.current = [];
+      return [];
+    });
   };
 
   const applyMove = (id, dayKey, opts = {}) => {
@@ -359,6 +515,7 @@ export default function AgendaView({
     }
     setDue?.(id, dayKey);
     setSelectedDay(dayKey);
+    setAnchorKey(dayKey);
     setMovingId(null);
     if (current) remember({ ...current, due: dayKey });
   };
@@ -394,14 +551,20 @@ export default function AgendaView({
     if (entry.type === 'delete') {
       restore?.(entry.item);
       remember(entry.item);
-      if (entry.item?.due) setSelectedDay(entry.item.due);
+      if (entry.item?.due) {
+        setSelectedDay(entry.item.due);
+        setAnchorKey(entry.item.due);
+      }
       return;
     }
     if (entry.type === 'move') {
       setDue?.(entry.id, entry.fromDue);
       const cur = lookup(entry.id);
       if (cur) remember({ ...cur, due: entry.fromDue });
-      if (entry.fromDue) setSelectedDay(entry.fromDue);
+      if (entry.fromDue) {
+        setSelectedDay(entry.fromDue);
+        setAnchorKey(entry.fromDue);
+      }
       return;
     }
     if (entry.type === 'rename') {
@@ -421,7 +584,10 @@ export default function AgendaView({
       setDue?.(entry.id, entry.toDue);
       const cur = lookup(entry.id);
       if (cur) remember({ ...cur, due: entry.toDue });
-      if (entry.toDue) setSelectedDay(entry.toDue);
+      if (entry.toDue) {
+        setSelectedDay(entry.toDue);
+        setAnchorKey(entry.toDue);
+      }
       return;
     }
     if (entry.type === 'rename') {
@@ -432,19 +598,33 @@ export default function AgendaView({
   };
 
   const undo = () => {
-    const entry = undoStack[undoStack.length - 1];
+    const stack = undoRef.current;
+    const entry = stack[stack.length - 1];
     if (!entry) return;
-    setUndoStack((prev) => prev.slice(0, -1));
-    setRedoStack((r) => [...r, entry]);
+    const next = stack.slice(0, -1);
+    undoRef.current = next;
+    setUndoStack(next);
+    setRedoStack((r) => {
+      const nr = [...r, entry];
+      redoRef.current = nr;
+      return nr;
+    });
     applyUndoEntry(entry);
     showToast('Undone', false);
   };
 
   const redo = () => {
-    const entry = redoStack[redoStack.length - 1];
+    const stack = redoRef.current;
+    const entry = stack[stack.length - 1];
     if (!entry) return;
-    setRedoStack((prev) => prev.slice(0, -1));
-    setUndoStack((u) => [...u, entry]);
+    const next = stack.slice(0, -1);
+    redoRef.current = next;
+    setRedoStack(next);
+    setUndoStack((u) => {
+      const nu = [...u, entry];
+      undoRef.current = nu;
+      return nu;
+    });
     applyRedoEntry(entry);
     showToast('Redone', false);
   };
@@ -461,6 +641,7 @@ export default function AgendaView({
   const startMove = (id) => {
     setMovingId(id);
     setSheetItem(null);
+    if (mode === 'month') setMode('day');
   };
 
   const onSelectDay = (dayKey) => {
@@ -470,14 +651,47 @@ export default function AgendaView({
       return;
     }
     setSelectedDay(dayKey);
+    setAnchorKey(dayKey);
     titleRef.current?.focus();
   };
 
   const openSheet = (item) => {
+    if (!item) return;
     remember(item);
     setSheetItem(item);
     setSheetDraft(item.title);
     setMovingId(null);
+  };
+
+  const jumpWeek = (delta) => {
+    const base = mode === 'week' ? anchorKey : selectedDay;
+    const next = addDays(base, delta * 7);
+    setAnchorKey(next);
+    setSelectedDay(next);
+  };
+
+  const jumpMonth = (delta) => {
+    const [y, m] = monthYm.split('-').map(Number);
+    let nm = m + delta;
+    let ny = y;
+    while (nm < 1) {
+      nm += 12;
+      ny -= 1;
+    }
+    while (nm > 12) {
+      nm -= 12;
+      ny += 1;
+    }
+    const dim = daysInMonth(ny, nm);
+    const dayNum = Math.min(Number(selectedDay.slice(8)) || 1, dim);
+    const next = `${ny}-${String(nm).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    setAnchorKey(next);
+    setSelectedDay(next);
+  };
+
+  const jumpToday = () => {
+    setSelectedDay(todayKey);
+    setAnchorKey(todayKey);
   };
 
   const toggleMic = () => {
@@ -527,19 +741,25 @@ export default function AgendaView({
     }
   };
 
+  const headerLine = (() => {
+    if (mode === 'week') return `Week · ${weekRangePretty(weekStripFor(anchorKey))}`;
+    if (mode === 'month') return monthTitle;
+    return `${parts.weekday}, ${parts.date}${isToday ? ' · Today' : ''}`;
+  })();
+
+  const weekNavLabel = weekRangePretty(weekStripFor(mode === 'week' ? anchorKey : selectedDay));
+
   return (
     <div className="view agenda-view notes-view">
       <header className="notes-header">
         <h1>Agenda</h1>
         <p className="date-line">
-          {mode === 'week'
-            ? `Week · ${weekLabel}`
-            : `${parts.weekday}, ${parts.date}${isToday ? ' · Today' : ''}`}
+          {headerLine}
           {counts?.overdue ? ` · ${counts.overdue} overdue` : ''}
         </p>
       </header>
 
-      <div className="notes-mode-tabs" role="tablist" aria-label="Agenda mode">
+      <div className="notes-mode-tabs tabs-3" role="tablist" aria-label="Agenda mode">
         <button
           type="button"
           role="tab"
@@ -554,11 +774,42 @@ export default function AgendaView({
           role="tab"
           aria-selected={mode === 'week'}
           className={`notes-mode-tab ${mode === 'week' ? 'active' : ''}`}
-          onClick={() => setMode('week')}
+          onClick={() => {
+            setMode('week');
+            setAnchorKey(selectedDay);
+          }}
         >
           Week
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'month'}
+          className={`notes-mode-tab ${mode === 'month' ? 'active' : ''}`}
+          onClick={() => {
+            setMode('month');
+            setAnchorKey(selectedDay);
+          }}
+        >
+          Month
+        </button>
       </div>
+
+      {mode === 'week' || mode === 'month' ? (
+        <NavChrome
+          label={mode === 'week' ? weekNavLabel : monthTitle}
+          onPrev={() => (mode === 'week' ? jumpWeek(-1) : jumpMonth(-1))}
+          onNext={() => (mode === 'week' ? jumpWeek(1) : jumpMonth(1))}
+          onToday={jumpToday}
+        />
+      ) : (
+        <NavChrome
+          label={weekNavLabel}
+          onPrev={() => jumpWeek(-1)}
+          onNext={() => jumpWeek(1)}
+          onToday={jumpToday}
+        />
+      )}
 
       <form className="notes-composer" onSubmit={submit}>
         <input
@@ -572,26 +823,6 @@ export default function AgendaView({
           autoComplete="off"
         />
         <div className="notes-composer-actions">
-          <button
-            type="button"
-            className="notes-undo-btn"
-            disabled={!undoStack.length}
-            onClick={undo}
-            aria-label="Undo"
-            title="Undo"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="notes-undo-btn"
-            disabled={!redoStack.length}
-            onClick={redo}
-            aria-label="Redo"
-            title="Redo"
-          >
-            Redo
-          </button>
           <MicButton
             supported={speechSupported}
             listening={listening}
@@ -603,15 +834,43 @@ export default function AgendaView({
         </div>
       </form>
 
-      <DayStrip
-        week={week}
-        selectedDay={selectedDay}
-        todayKey={todayKey}
-        itemsForDate={itemsForDate}
-        onSelectDay={onSelectDay}
-        onDropDay={(id, dayKey) => applyMove(id, dayKey)}
-        emphasize={Boolean(movingId)}
-      />
+      <div className="notes-undo-bar" role="group" aria-label="Undo and redo">
+        <button
+          type="button"
+          className={`notes-undo-btn ${undoStack.length ? 'ready' : ''}`}
+          disabled={!undoStack.length}
+          onClick={undo}
+          aria-label="Undo"
+          title="Undo"
+        >
+          Undo{undoStack.length ? ` (${undoStack.length})` : ''}
+        </button>
+        <button
+          type="button"
+          className={`notes-undo-btn ${redoStack.length ? 'ready' : ''}`}
+          disabled={!redoStack.length}
+          onClick={redo}
+          aria-label="Redo"
+          title="Redo"
+        >
+          Redo{redoStack.length ? ` (${redoStack.length})` : ''}
+        </button>
+      </div>
+
+      {mode !== 'month' ? (
+        <DayStrip
+          week={mode === 'week' ? weekStripFor(anchorKey) : week}
+          selectedDay={selectedDay}
+          todayKey={todayKey}
+          itemsForDate={itemsForDate}
+          onSelectDay={(dayKey) => {
+            onSelectDay(dayKey);
+            if (mode === 'week') setMode('day');
+          }}
+          onDropDay={(id, dayKey) => applyMove(id, dayKey)}
+          emphasize={Boolean(movingId)}
+        />
+      ) : null}
 
       {movingId ? (
         <p className="notes-move-hint soft" role="status">
@@ -636,12 +895,15 @@ export default function AgendaView({
                   onToggle={toggle}
                   onOpen={openSheet}
                   moving={movingId === it.id}
+                  canDrag={canDrag}
                 />
               ))}
             </ul>
           )}
         </section>
-      ) : (
+      ) : null}
+
+      {mode === 'week' ? (
         <section className="notes-week-list" aria-label="Week notes">
           {weekSections.map((sec) => (
             <div
@@ -651,7 +913,10 @@ export default function AgendaView({
               <button
                 type="button"
                 className="notes-week-day-head"
-                onClick={() => onSelectDay(sec.key)}
+                onClick={() => {
+                  onSelectDay(sec.key);
+                  setMode('day');
+                }}
               >
                 <strong>
                   {sec.isToday ? 'Today' : sec.parts.weekday}
@@ -671,6 +936,7 @@ export default function AgendaView({
                       onOpen={openSheet}
                       moving={movingId === it.id}
                       compact
+                      canDrag={canDrag}
                     />
                   ))}
                 </ul>
@@ -678,10 +944,50 @@ export default function AgendaView({
             </div>
           ))}
         </section>
-      )}
+      ) : null}
+
+      {mode === 'month' ? (
+        <section className="card notes-month-card" aria-label="Month calendar">
+          <div className="notes-month-dows" aria-hidden="true">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="notes-month-grid">
+            {grid.cells.map((cell) => {
+              const items = itemsForDate(cell.key) || [];
+              const open = items.filter((i) => !i.done).length;
+              const active = cell.key === selectedDay;
+              const isTod = cell.key === todayKey;
+              return (
+                <button
+                  key={cell.key}
+                  type="button"
+                  className={`notes-month-cell ${cell.inMonth ? '' : 'out'} ${active ? 'active' : ''} ${isTod ? 'is-today' : ''} ${open ? 'has-notes' : ''}`}
+                  onClick={() => {
+                    if (movingId) {
+                      applyMove(movingId, cell.key);
+                      setMode('day');
+                      return;
+                    }
+                    setSelectedDay(cell.key);
+                    setAnchorKey(cell.key);
+                    setMode('day');
+                  }}
+                  aria-label={`${cell.key}${open ? `, ${open} notes` : ''}`}
+                >
+                  <span className="notes-month-num">{cell.dayNum}</span>
+                  {open > 0 ? <span className="notes-month-dot" aria-hidden="true" /> : null}
+                </button>
+              );
+            })}
+          </div>
+          <p className="notes-month-hint">Tap a day to open its notes</p>
+        </section>
+      ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v18</p>
+        <p>Manuel OS · local · v19</p>
       </footer>
 
       <NoteSheet
