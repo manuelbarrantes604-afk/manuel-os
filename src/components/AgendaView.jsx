@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatAgendaDayParts, weekStripFor } from '../lib/time';
-import { addDays, monthLabel, weekRangeLabel } from '../hooks/useAgenda';
+import { addDays, monthLabel } from '../hooks/useAgenda';
+import {
+  PERIODS,
+  iconForTitle,
+  inferPeriod,
+  monthAbbrev,
+} from '../lib/tiimoIcons';
 
 const SpeechRecognitionAPI =
   typeof window !== 'undefined'
@@ -40,22 +46,17 @@ function daysInMonth(year, month /* 1-12 */) {
   return new Date(Date.UTC(year, month, 0, 12)).getUTCDate();
 }
 
-/** Calendar cells for a month (Mon-first), including leading/trailing padding. */
 function monthGrid(ym) {
   const [y, m] = ym.split('-').map(Number);
   const dim = daysInMonth(y, m);
   const firstKey = `${ym}-01`;
-  const strip = weekStripFor(firstKey);
-  const mondayOfFirst = strip[0].key;
-  // How many leading days before the 1st?
   const lead = (() => {
     const [fy, fm, fd] = firstKey.split('-').map(Number);
     const noon = new Date(Date.UTC(fy, fm - 1, fd, 12));
-    const dow = noon.getUTCDay(); // 0 Sun
+    const dow = noon.getUTCDay();
     return dow === 0 ? 6 : dow - 1;
   })();
   const cells = [];
-  // Leading from previous month
   for (let i = lead; i > 0; i -= 1) {
     const key = addDays(firstKey, -i);
     cells.push({ key, inMonth: false, dayNum: Number(key.slice(8)) });
@@ -64,13 +65,12 @@ function monthGrid(ym) {
     const key = `${ym}-${String(d).padStart(2, '0')}`;
     cells.push({ key, inMonth: true, dayNum: d });
   }
-  // Trailing to complete weeks
   while (cells.length % 7 !== 0) {
     const last = cells[cells.length - 1].key;
     const key = addDays(last, 1);
     cells.push({ key, inMonth: false, dayNum: Number(key.slice(8)) });
   }
-  return { cells, mondayOfFirst, ym };
+  return { cells, ym };
 }
 
 function useFinePointer() {
@@ -86,10 +86,23 @@ function useFinePointer() {
   return fine;
 }
 
-function NoteRow({ item, onToggle, onOpen, moving, compact, canDrag }) {
+function PastelIcon({ title, size = 40 }) {
+  const { emoji, bg } = iconForTitle(title);
+  return (
+    <span
+      className="tiimo-icon"
+      style={{ background: bg, width: size, height: size, fontSize: size * 0.42 }}
+      aria-hidden="true"
+    >
+      {emoji}
+    </span>
+  );
+}
+
+function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
   return (
     <li
-      className={`note-row ${item.done ? 'done' : ''} ${moving ? 'moving' : ''} ${compact ? 'compact' : ''}`}
+      className={`tiimo-task ${item.done ? 'done' : ''} ${moving ? 'moving' : ''}`}
       draggable={canDrag}
       onDragStart={
         canDrag
@@ -100,9 +113,20 @@ function NoteRow({ item, onToggle, onOpen, moving, compact, canDrag }) {
           : undefined
       }
     >
+      <PastelIcon title={item.title} />
       <button
         type="button"
-        className="note-check"
+        className="tiimo-task-main"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(item);
+        }}
+      >
+        <strong className="tiimo-task-title">{item.title}</strong>
+      </button>
+      <button
+        type="button"
+        className="tiimo-check"
         aria-label={item.done ? 'Mark open' : 'Mark done'}
         aria-pressed={item.done}
         onClick={(e) => {
@@ -114,17 +138,62 @@ function NoteRow({ item, onToggle, onOpen, moving, compact, canDrag }) {
       >
         {item.done ? '✓' : ''}
       </button>
-      <button
-        type="button"
-        className="note-title-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen(item);
-        }}
-      >
-        {item.title}
-      </button>
     </li>
+  );
+}
+
+function PeriodGroup({ period, items, open, onToggleOpen, onAdd, onToggle, onOpen, movingId, canDrag }) {
+  const count = items.length;
+  const meta = PERIODS.find((p) => p.id === period) || PERIODS[1];
+  return (
+    <section className={`tiimo-period ${open ? 'open' : 'closed'}`}>
+      <div className="tiimo-period-head">
+        <button
+          type="button"
+          className="tiimo-period-toggle"
+          onClick={onToggleOpen}
+          aria-expanded={open}
+        >
+          <span className="tiimo-period-glyph" aria-hidden="true">
+            {meta.icon}
+          </span>
+          <span className="tiimo-period-label">
+            {meta.label} ({count})
+          </span>
+          <span className="tiimo-period-chevron" aria-hidden="true">
+            {open ? '▾' : '▸'}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="tiimo-period-add"
+          aria-label={`Add to ${meta.label.toLowerCase()}`}
+          onClick={onAdd}
+        >
+          +
+        </button>
+      </div>
+      {open ? (
+        <div className="tiimo-period-body">
+          {items.length === 0 ? (
+            <p className="tiimo-period-empty">Nothing here</p>
+          ) : (
+            <ul className="tiimo-task-list">
+              {items.map((it) => (
+                <NoteRow
+                  key={it.id}
+                  item={it}
+                  onToggle={onToggle}
+                  onOpen={onOpen}
+                  moving={movingId === it.id}
+                  canDrag={canDrag}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -157,14 +226,14 @@ function DayStrip({
 
   return (
     <div
-      className={`notes-day-strip ${emphasize ? 'move-ready' : ''}`}
+      className={`tiimo-week-strip ${emphasize ? 'move-ready' : ''}`}
       role="tablist"
-      aria-label={emphasize ? 'Pick a day to move' : 'Day'}
+      aria-label={emphasize ? 'Pick a day to move' : 'Week'}
     >
       {week.map((d) => {
         const active = d.key === selectedDay;
         const n = (itemsForDate(d.key) || []).filter((i) => !i.done).length;
-        const dow = formatAgendaDayParts(d.key).weekday.slice(0, 3);
+        const letter = d.dow.charAt(0);
         const dropLit = dragOver === d.key;
         return (
           <button
@@ -172,7 +241,7 @@ function DayStrip({
             type="button"
             role="tab"
             aria-selected={active}
-            className={`notes-day-chip ${active ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''} ${dropLit ? 'drop-lit' : ''}`}
+            className={`tiimo-week-day ${active ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''} ${dropLit ? 'drop-lit' : ''}`}
             onClick={() => onSelectDay(d.key)}
             onDragOver={(e) => {
               e.preventDefault();
@@ -187,9 +256,16 @@ function DayStrip({
               if (id) onDropDay(id, d.key);
             }}
           >
-            <span className="notes-day-dow">{dow}</span>
-            <span className="notes-day-num">{Number(d.key.slice(8))}</span>
-            {n > 0 ? <span className="notes-day-dot" aria-hidden="true" /> : null}
+            <span className="tiimo-week-letter">{letter}</span>
+            <span className="tiimo-week-num">{Number(d.key.slice(8))}</span>
+            {active || n > 0 ? (
+              <span
+                className={`tiimo-week-dot ${active ? 'on' : ''}`}
+                aria-hidden="true"
+              />
+            ) : (
+              <span className="tiimo-week-dot spacer" aria-hidden="true" />
+            )}
           </button>
         );
       })}
@@ -201,6 +277,8 @@ function NoteSheet({
   item,
   draft,
   setDraft,
+  period,
+  setPeriod,
   onClose,
   onSave,
   onMove,
@@ -236,7 +314,7 @@ function NoteSheet({
   const label = item.due === todayKey ? 'Today' : parts.weekday;
 
   const commitAndClose = () => {
-    onSave(draft);
+    onSave(draft, period);
     onClose();
   };
 
@@ -268,22 +346,30 @@ function NoteSheet({
             }
           }}
         />
+        <div className="tiimo-period-pills" role="group" aria-label="Period">
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`tiimo-period-pill ${period === p.id ? 'active' : ''}`}
+              onClick={() => setPeriod(p.id)}
+            >
+              {p.label.charAt(0) + p.label.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
         <div className="note-sheet-actions">
           <button
             type="button"
             className="note-sheet-btn move"
             onClick={() => {
-              onSave(draft);
+              onSave(draft, period);
               onMove();
             }}
           >
             Move
           </button>
-          <button
-            type="button"
-            className="note-sheet-btn danger"
-            onClick={onRemove}
-          >
+          <button type="button" className="note-sheet-btn danger" onClick={onRemove}>
             Remove
           </button>
           <button type="button" className="note-sheet-btn done" onClick={commitAndClose}>
@@ -323,25 +409,79 @@ function UndoToast({ toast, onUndo, onDismiss }) {
   return createPortal(node, document.body);
 }
 
-function NavChrome({ label, onPrev, onNext, onToday }) {
-  return (
-    <div className="notes-nav-chrome" role="group" aria-label="Navigate">
-      <button type="button" className="notes-nav-btn" onClick={onPrev} aria-label="Previous">
-        ‹
-      </button>
+function ComposerModal({
+  open,
+  title,
+  setTitle,
+  period,
+  setPeriod,
+  onSubmit,
+  onClose,
+  listening,
+  onMic,
+  speechSupported,
+}) {
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const t = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(t);
+  }, [open]);
+
+  if (!open) return null;
+
+  const node = (
+    <div className="note-sheet-root" role="presentation">
       <button
         type="button"
-        className="notes-nav-label"
-        onClick={onToday}
-        title="Jump to today"
-      >
-        {label}
-      </button>
-      <button type="button" className="notes-nav-btn" onClick={onNext} aria-label="Next">
-        ›
-      </button>
+        className="note-sheet-backdrop"
+        aria-label="Close composer"
+        onClick={onClose}
+      />
+      <div className="note-sheet tiimo-composer-sheet" role="dialog" aria-modal="true" aria-label="Add note">
+        <div className="note-sheet-handle" aria-hidden="true" />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+        >
+          <input
+            ref={inputRef}
+            className="notes-input"
+            type="text"
+            placeholder="Write a note…"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            aria-label="New note"
+            autoComplete="off"
+          />
+          <div className="tiimo-period-pills" role="group" aria-label="Period">
+            {PERIODS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`tiimo-period-pill ${period === p.id ? 'active' : ''}`}
+                onClick={() => setPeriod(p.id)}
+              >
+                {p.icon} {p.label.charAt(0) + p.label.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+          <div className="notes-composer-actions">
+            <MicButton supported={speechSupported} listening={listening} onToggle={onMic} />
+            <button type="button" className="note-sheet-btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="note-sheet-btn done">
+              Add
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
+  return createPortal(node, document.body);
 }
 
 export default function AgendaView({
@@ -357,20 +497,29 @@ export default function AgendaView({
   getItem,
   rename,
   setDue,
+  setPeriod,
   focusComposer,
+  streak,
 }) {
   const [mode, setMode] = useState('day');
   const [selectedDay, setSelectedDay] = useState(todayKey);
   const [anchorKey, setAnchorKey] = useState(todayKey);
   const [title, setTitle] = useState('');
+  const [composePeriod, setComposePeriod] = useState('afternoon');
+  const [composerOpen, setComposerOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [movingId, setMovingId] = useState(null);
   const [sheetItem, setSheetItem] = useState(null);
   const [sheetDraft, setSheetDraft] = useState('');
+  const [sheetPeriod, setSheetPeriod] = useState('afternoon');
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [toast, setToast] = useState(null);
-  const titleRef = useRef(null);
+  const [openPeriods, setOpenPeriods] = useState({
+    morning: true,
+    afternoon: true,
+    evening: true,
+  });
   const recognitionRef = useRef(null);
   const toastTimer = useRef(null);
   const cacheRef = useRef(new Map());
@@ -387,9 +536,6 @@ export default function AgendaView({
   }, [redoStack]);
 
   const week = useMemo(() => weekStripFor(selectedDay), [selectedDay]);
-  const weekKeys = useMemo(() => week.map((d) => d.key), [week]);
-  const weekLabel = useMemo(() => weekRangePretty(week) || weekRangeLabel(week), [week]);
-
   const monthYm = useMemo(() => anchorKey.slice(0, 7), [anchorKey]);
   const monthTitle = useMemo(() => monthLabel(monthYm), [monthYm]);
   const grid = useMemo(() => monthGrid(monthYm), [monthYm]);
@@ -397,7 +543,6 @@ export default function AgendaView({
   const remember = (it) => {
     if (it?.id) cacheRef.current.set(it.id, { ...it });
   };
-
   const lookup = (id) => getItem?.(id) || cacheRef.current.get(id) || null;
 
   useEffect(() => {
@@ -406,13 +551,11 @@ export default function AgendaView({
   }, [todayKey]);
 
   useEffect(() => {
-    if (focusComposer) titleRef.current?.focus();
+    if (focusComposer) {
+      setComposerOpen(true);
+      setComposePeriod('afternoon');
+    }
   }, [focusComposer]);
-
-  useEffect(() => {
-    const t = requestAnimationFrame(() => titleRef.current?.focus());
-    return () => cancelAnimationFrame(t);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -425,15 +568,14 @@ export default function AgendaView({
     };
   }, []);
 
-  // Lock body scroll while sheet is open (phone)
   useEffect(() => {
-    if (!sheetItem) return undefined;
+    if (!sheetItem && !composerOpen) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [sheetItem]);
+  }, [sheetItem, composerOpen]);
 
   const dayItems = useMemo(() => {
     const list = itemsForDate(selectedDay) || [];
@@ -447,6 +589,15 @@ export default function AgendaView({
 
   useEffect(() => {
     for (const it of dayItems) remember(it);
+  }, [dayItems]);
+
+  const grouped = useMemo(() => {
+    const buckets = { morning: [], afternoon: [], evening: [] };
+    for (const it of dayItems) {
+      const p = inferPeriod(it.title, it.period);
+      buckets[p].push(it);
+    }
+    return buckets;
   }, [dayItems]);
 
   const weekSections = useMemo(() => {
@@ -473,9 +624,7 @@ export default function AgendaView({
     }
   }, [weekSections]);
 
-  const openCount = dayItems.filter((i) => !i.done).length;
   const parts = formatAgendaDayParts(selectedDay);
-  const isToday = selectedDay === todayKey;
 
   const showToast = (message, canUndo = true) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -530,19 +679,26 @@ export default function AgendaView({
     showToast('Note deleted');
   };
 
-  const doRename = (item, nextTitle, opts = {}) => {
+  const doRename = (item, nextTitle, nextPeriod, opts = {}) => {
     const t = String(nextTitle || '').trim();
-    if (!item?.id || !t || t === item.title) return false;
+    if (!item?.id || !t) return false;
+    const periodChanged =
+      nextPeriod && nextPeriod !== inferPeriod(item.title, item.period);
+    const titleChanged = t !== item.title;
+    if (!titleChanged && !periodChanged) return false;
     if (!opts.silent) {
       pushUndo({
         type: 'rename',
         id: item.id,
         fromTitle: item.title,
         toTitle: t,
+        fromPeriod: item.period || inferPeriod(item.title),
+        toPeriod: nextPeriod || item.period || 'afternoon',
       });
     }
-    rename(item.id, t);
-    remember({ ...item, title: t });
+    if (titleChanged) rename(item.id, t);
+    if (nextPeriod) setPeriod?.(item.id, nextPeriod);
+    remember({ ...item, title: t, period: nextPeriod || item.period });
     return true;
   };
 
@@ -569,8 +725,9 @@ export default function AgendaView({
     }
     if (entry.type === 'rename') {
       rename(entry.id, entry.fromTitle);
+      if (entry.fromPeriod) setPeriod?.(entry.id, entry.fromPeriod);
       const cur = lookup(entry.id);
-      if (cur) remember({ ...cur, title: entry.fromTitle });
+      if (cur) remember({ ...cur, title: entry.fromTitle, period: entry.fromPeriod });
     }
   };
 
@@ -592,8 +749,9 @@ export default function AgendaView({
     }
     if (entry.type === 'rename') {
       rename(entry.id, entry.toTitle);
+      if (entry.toPeriod) setPeriod?.(entry.id, entry.toPeriod);
       const cur = lookup(entry.id);
-      if (cur) remember({ ...cur, title: entry.toTitle });
+      if (cur) remember({ ...cur, title: entry.toTitle, period: entry.toPeriod });
     }
   };
 
@@ -629,13 +787,13 @@ export default function AgendaView({
     showToast('Redone', false);
   };
 
-  const submit = (e) => {
-    e?.preventDefault?.();
+  const submit = () => {
     const t = title.trim();
     if (!t) return;
-    add(t, selectedDay || todayKey);
+    add(t, selectedDay || todayKey, composePeriod);
     setTitle('');
-    titleRef.current?.focus();
+    setComposerOpen(false);
+    setOpenPeriods((prev) => ({ ...prev, [composePeriod]: true }));
   };
 
   const startMove = (id) => {
@@ -647,12 +805,10 @@ export default function AgendaView({
   const onSelectDay = (dayKey) => {
     if (movingId) {
       applyMove(movingId, dayKey);
-      titleRef.current?.focus();
       return;
     }
     setSelectedDay(dayKey);
     setAnchorKey(dayKey);
-    titleRef.current?.focus();
   };
 
   const openSheet = (item) => {
@@ -660,7 +816,13 @@ export default function AgendaView({
     remember(item);
     setSheetItem(item);
     setSheetDraft(item.title);
+    setSheetPeriod(inferPeriod(item.title, item.period));
     setMovingId(null);
+  };
+
+  const openComposerFor = (period) => {
+    setComposePeriod(period || 'afternoon');
+    setComposerOpen(true);
   };
 
   const jumpWeek = (delta) => {
@@ -696,7 +858,6 @@ export default function AgendaView({
 
   const toggleMic = () => {
     if (!SpeechRecognitionAPI) return;
-
     if (listening && recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -706,7 +867,6 @@ export default function AgendaView({
       setListening(false);
       return;
     }
-
     let recognition;
     try {
       recognition = new SpeechRecognitionAPI();
@@ -717,22 +877,16 @@ export default function AgendaView({
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognitionRef.current = recognition;
-
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
         .map((r) => r[0]?.transcript || '')
         .join(' ')
         .trim();
       if (!transcript) return;
-      setTitle((prev) => {
-        const next = prev.trim() ? `${prev.trim()} ${transcript}` : transcript;
-        return next;
-      });
-      titleRef.current?.focus();
+      setTitle((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
     };
     recognition.onerror = () => setListening(false);
     recognition.onend = () => setListening(false);
-
     try {
       recognition.start();
       setListening(true);
@@ -741,25 +895,51 @@ export default function AgendaView({
     }
   };
 
-  const headerLine = (() => {
-    if (mode === 'week') return `Week · ${weekRangePretty(weekStripFor(anchorKey))}`;
-    if (mode === 'month') return monthTitle;
-    return `${parts.weekday}, ${parts.date}${isToday ? ' · Today' : ''}`;
-  })();
-
-  const weekNavLabel = weekRangePretty(weekStripFor(mode === 'week' ? anchorKey : selectedDay));
+  const weekNavLabel = weekRangePretty(
+    weekStripFor(mode === 'week' ? anchorKey : selectedDay),
+  );
 
   return (
-    <div className="view agenda-view notes-view">
-      <header className="notes-header">
-        <h1>Agenda</h1>
-        <p className="date-line">
-          {headerLine}
-          {counts?.overdue ? ` · ${counts.overdue} overdue` : ''}
-        </p>
+    <div className="view agenda-view notes-view tiimo-agenda">
+      <header className="tiimo-topbar">
+        <div className="tiimo-chips">
+          {streak ? (
+            <span className="tiimo-streak-chip" title="Day streak">
+              <span aria-hidden="true">🔥</span> {streak.current}
+            </span>
+          ) : null}
+          {streak ? (
+            <span className="tiimo-xp-chip" title="Lifetime XP">
+              ✦ {streak.xp}
+            </span>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="tiimo-add-btn"
+          aria-label="Add note"
+          onClick={() => openComposerFor('afternoon')}
+        >
+          +
+        </button>
       </header>
 
-      <div className="notes-mode-tabs tabs-3" role="tablist" aria-label="Agenda mode">
+      <div className="tiimo-day-head">
+        <h1 className="tiimo-day-title">{parts.weekday}</h1>
+        <button
+          type="button"
+          className="tiimo-month-link"
+          onClick={() => {
+            setMode('month');
+            setAnchorKey(selectedDay);
+          }}
+          aria-label="Open month"
+        >
+          {monthAbbrev(selectedDay)} <span aria-hidden="true">›</span>
+        </button>
+      </div>
+
+      <div className="notes-mode-tabs tabs-3 tiimo-mode-tabs" role="tablist" aria-label="Agenda mode">
         <button
           type="button"
           role="tab"
@@ -795,53 +975,50 @@ export default function AgendaView({
         </button>
       </div>
 
-      {mode === 'week' || mode === 'month' ? (
-        <NavChrome
-          label={mode === 'week' ? weekNavLabel : monthTitle}
-          onPrev={() => (mode === 'week' ? jumpWeek(-1) : jumpMonth(-1))}
-          onNext={() => (mode === 'week' ? jumpWeek(1) : jumpMonth(1))}
-          onToday={jumpToday}
-        />
-      ) : (
-        <NavChrome
-          label={weekNavLabel}
-          onPrev={() => jumpWeek(-1)}
-          onNext={() => jumpWeek(1)}
-          onToday={jumpToday}
-        />
-      )}
-
-      <form className="notes-composer" onSubmit={submit}>
-        <input
-          ref={titleRef}
-          className="notes-input"
-          type="text"
-          placeholder="Write a note…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          aria-label="New note"
-          autoComplete="off"
-        />
-        <div className="notes-composer-actions">
-          <MicButton
-            supported={speechSupported}
-            listening={listening}
-            onToggle={toggleMic}
-          />
-          <button type="submit" className="notes-add" aria-label="Add note">
-            Add
+      {(mode === 'week' || mode === 'month') && (
+        <div className="notes-nav-chrome tiimo-nav-chrome" role="group" aria-label="Navigate">
+          <button
+            type="button"
+            className="notes-nav-btn"
+            onClick={() => (mode === 'week' ? jumpWeek(-1) : jumpMonth(-1))}
+            aria-label="Previous"
+          >
+            ‹
+          </button>
+          <button type="button" className="notes-nav-label" onClick={jumpToday} title="Jump to today">
+            {mode === 'week' ? weekNavLabel : monthTitle}
+          </button>
+          <button
+            type="button"
+            className="notes-nav-btn"
+            onClick={() => (mode === 'week' ? jumpWeek(1) : jumpMonth(1))}
+            aria-label="Next"
+          >
+            ›
           </button>
         </div>
-      </form>
+      )}
 
-      <div className="notes-undo-bar" role="group" aria-label="Undo and redo">
+      {mode === 'day' ? (
+        <div className="notes-nav-chrome tiimo-nav-chrome subtle" role="group" aria-label="Week navigate">
+          <button type="button" className="notes-nav-btn" onClick={() => jumpWeek(-1)} aria-label="Previous week">
+            ‹
+          </button>
+          <button type="button" className="notes-nav-label" onClick={jumpToday}>
+            {weekNavLabel}
+          </button>
+          <button type="button" className="notes-nav-btn" onClick={() => jumpWeek(1)} aria-label="Next week">
+            ›
+          </button>
+        </div>
+      ) : null}
+
+      <div className="notes-undo-bar tiimo-undo-bar" role="group" aria-label="Undo and redo">
         <button
           type="button"
           className={`notes-undo-btn ${undoStack.length ? 'ready' : ''}`}
           disabled={!undoStack.length}
           onClick={undo}
-          aria-label="Undo"
-          title="Undo"
         >
           Undo{undoStack.length ? ` (${undoStack.length})` : ''}
         </button>
@@ -850,8 +1027,6 @@ export default function AgendaView({
           className={`notes-undo-btn ${redoStack.length ? 'ready' : ''}`}
           disabled={!redoStack.length}
           onClick={redo}
-          aria-label="Redo"
-          title="Redo"
         >
           Redo{redoStack.length ? ` (${redoStack.length})` : ''}
         </button>
@@ -878,29 +1053,29 @@ export default function AgendaView({
         </p>
       ) : null}
 
+      {counts?.overdue ? (
+        <p className="tiimo-overdue-hint">{counts.overdue} overdue</p>
+      ) : null}
+
       {mode === 'day' ? (
-        <section className="card notes-list-card">
-          <div className="notes-list-head">
-            <strong>{isToday ? 'Today' : parts.weekday}</strong>
-            <span className="card-sub">{openCount || '—'}</span>
-          </div>
-          {dayItems.length === 0 ? (
-            <p className="notes-empty">No notes yet</p>
-          ) : (
-            <ul className="notes-list">
-              {dayItems.map((it) => (
-                <NoteRow
-                  key={it.id}
-                  item={it}
-                  onToggle={toggle}
-                  onOpen={openSheet}
-                  moving={movingId === it.id}
-                  canDrag={canDrag}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
+        <div className="tiimo-periods">
+          {PERIODS.map((p) => (
+            <PeriodGroup
+              key={p.id}
+              period={p.id}
+              items={grouped[p.id]}
+              open={openPeriods[p.id]}
+              onToggleOpen={() =>
+                setOpenPeriods((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
+              }
+              onAdd={() => openComposerFor(p.id)}
+              onToggle={toggle}
+              onOpen={openSheet}
+              movingId={movingId}
+              canDrag={canDrag}
+            />
+          ))}
+        </div>
       ) : null}
 
       {mode === 'week' ? (
@@ -927,7 +1102,7 @@ export default function AgendaView({
               {sec.items.length === 0 ? (
                 <p className="notes-week-empty">—</p>
               ) : (
-                <ul className="notes-list">
+                <ul className="tiimo-task-list">
                   {sec.items.map((it) => (
                     <NoteRow
                       key={it.id}
@@ -935,7 +1110,6 @@ export default function AgendaView({
                       onToggle={toggle}
                       onOpen={openSheet}
                       moving={movingId === it.id}
-                      compact
                       canDrag={canDrag}
                     />
                   ))}
@@ -987,17 +1161,19 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v19</p>
+        <p>Manuel OS · local · v20</p>
       </footer>
 
       <NoteSheet
         item={sheetItem}
         draft={sheetDraft}
         setDraft={setSheetDraft}
+        period={sheetPeriod}
+        setPeriod={setSheetPeriod}
         todayKey={todayKey}
         onClose={() => setSheetItem(null)}
-        onSave={(draft) => {
-          if (sheetItem) doRename(sheetItem, draft);
+        onSave={(draft, period) => {
+          if (sheetItem) doRename(sheetItem, draft, period);
         }}
         onMove={() => {
           if (sheetItem) startMove(sheetItem.id);
@@ -1005,6 +1181,19 @@ export default function AgendaView({
         onRemove={() => {
           if (sheetItem) doRemove(sheetItem);
         }}
+      />
+
+      <ComposerModal
+        open={composerOpen}
+        title={title}
+        setTitle={setTitle}
+        period={composePeriod}
+        setPeriod={setComposePeriod}
+        onSubmit={submit}
+        onClose={() => setComposerOpen(false)}
+        listening={listening}
+        onMic={toggleMic}
+        speechSupported={speechSupported}
       />
 
       <UndoToast

@@ -1,26 +1,34 @@
 :root {
-  --bg: #f5f2eb;
-  --bg-soft: #efebe3;
-  --surface: #fffcf7;
-  --surface-2: #f3efe6;
-  --border: rgba(60, 50, 40, 0.09);
-  --border-strong: rgba(60, 50, 40, 0.14);
+  --bg: #ffffff;
+  --bg-soft: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --border: rgba(24, 24, 27, 0.07);
+  --border-strong: rgba(24, 24, 27, 0.12);
   --text: #18181b;
   --text-soft: #3f3f46;
-  --muted: #71717a;
-  --green: #16a34a;
+  --muted: #a1a1aa;
+  --green: #22c55e;
   --green-dark: #15803d;
-  --green-soft: rgba(22, 163, 74, 0.08);
+  --green-soft: rgba(34, 197, 94, 0.1);
   --amber: #ca8a04;
   --amber-soft: rgba(202, 138, 4, 0.1);
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.08);
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
-  --shadow-lg: 0 4px 16px rgba(15, 23, 42, 0.05);
+  --pastel-mint: #d8f3e0;
+  --pastel-peach: #ffe4d6;
+  --pastel-sky: #d9ecff;
+  --pastel-lilac: #ebe4ff;
+  --pastel-butter: #fff3c4;
+  --pastel-rose: #ffe0ea;
+  --pastel-sage: #e4efe6;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 6px 18px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.08);
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'DM Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --radius: 16px;
-  --radius-sm: 12px;
+  --serif: 'Lora', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --radius: 18px;
+  --radius-sm: 14px;
   color-scheme: light;
   font-family: var(--sans);
   font-synthesis: none;
@@ -61,5 +69,5 @@ a {
 }
 
 ::selection {
-  background: rgba(22, 163, 74, 0.16);
+  background: rgba(34, 197, 94, 0.16);
 }

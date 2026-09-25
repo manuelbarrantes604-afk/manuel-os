@@ -3403,3 +3403,686 @@
 .streak-cal-cell.earned .streak-cal-num {
   color: var(--green-dark);
 }
+
+/* ========== v20 Tiimo-inspired calm UI ========== */
+
+.mos-shell {
+  background: var(--bg);
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+}
+
+.mos-frame {
+  padding-top: 10px;
+}
+
+.bottom-nav.tiimo-nav {
+  left: 50%;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: calc(100% - 28px);
+  max-width: 400px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.bottom-nav.tiimo-nav button {
+  border-radius: 16px;
+  padding: 8px 6px;
+  color: var(--muted);
+}
+
+.bottom-nav.tiimo-nav button.active {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.bottom-nav.tiimo-nav button.active .nav-icon {
+  color: var(--text);
+  opacity: 1;
+}
+
+.nav-icon {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+/* Top chips + add */
+.tiimo-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.tiimo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tiimo-streak-chip,
+.tiimo-xp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.tiimo-add-btn {
+  appearance: none;
+  border: 0;
+  background: var(--text);
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.tiimo-add-btn:active {
+  transform: scale(0.96);
+}
+
+/* Serif day title */
+.tiimo-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 6px;
+}
+
+.tiimo-day-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 2.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.tiimo-month-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+
+.tiimo-month-link.static {
+  cursor: default;
+}
+
+.tiimo-mode-tabs {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.tiimo-mode-tabs .notes-mode-tab {
+  background: var(--surface-2);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  min-height: 34px;
+  padding: 6px 10px;
+  box-shadow: none;
+}
+
+.tiimo-mode-tabs .notes-mode-tab.active {
+  background: var(--text);
+  color: #fff;
+  box-shadow: none;
+}
+
+.tiimo-nav-chrome.subtle .notes-nav-btn,
+.tiimo-nav-chrome .notes-nav-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+}
+
+.tiimo-nav-chrome .notes-nav-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tiimo-undo-bar {
+  opacity: 0.9;
+}
+
+.tiimo-undo-bar .notes-undo-btn {
+  border: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.76rem;
+  min-height: 36px;
+  border-radius: 999px;
+}
+
+.tiimo-undo-bar .notes-undo-btn.ready {
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 0;
+}
+
+/* Week strip — Tiimo */
+.tiimo-week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 4px 0 8px;
+}
+
+.tiimo-week-strip.move-ready {
+  outline: 1.5px dashed rgba(24, 24, 27, 0.18);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+.tiimo-week-day {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0 4px;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 12px;
+  min-height: 56px;
+}
+
+.tiimo-week-day.active {
+  color: var(--text);
+}
+
+.tiimo-week-day.drop-lit {
+  background: var(--surface-2);
+}
+
+.tiimo-week-letter {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tiimo-week-num {
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tiimo-week-day.active .tiimo-week-num {
+  font-weight: 750;
+}
+
+.tiimo-week-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: transparent;
+  margin-top: 1px;
+}
+
+.tiimo-week-dot.on {
+  background: var(--text);
+}
+
+.tiimo-week-dot:not(.on):not(.spacer) {
+  background: rgba(24, 24, 27, 0.18);
+}
+
+.tiimo-week-dot.spacer {
+  visibility: hidden;
+}
+
+.tiimo-overdue-hint {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--danger);
+  text-align: center;
+}
+
+/* Period groups */
+.tiimo-periods {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tiimo-period {
+  background: transparent;
+  border: 0;
+  padding: 4px 0 8px;
+  box-shadow: none;
+}
+
+.tiimo-period.period-card {
+  background: transparent;
+  border: 0;
+  padding: 4px 0 10px;
+  overflow: visible;
+}
+
+.tiimo-period-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tiimo-period-head.static {
+  margin-bottom: 2px;
+}
+
+.tiimo-period-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.tiimo-period-glyph {
+  font-size: 0.9rem;
+  color: var(--muted);
+  width: 1.1rem;
+  text-align: center;
+}
+
+.tiimo-period-label {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tiimo-period-chevron {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.tiimo-period-add {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 1.15rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.tiimo-period-add:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.tiimo-period-empty {
+  margin: 0;
+  padding: 6px 8px 10px 50px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tiimo-coach {
+  margin: 0 0 8px 2px;
+  padding-left: 28px;
+}
+
+/* Task rows */
+.tiimo-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tiimo-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  min-height: 56px;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+}
+
+.tiimo-task.moving {
+  background: var(--surface-2);
+}
+
+.tiimo-task.done {
+  opacity: 0.45;
+}
+
+.tiimo-task.done .tiimo-task-title {
+  text-decoration: line-through;
+}
+
+.tiimo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.tiimo-task-main {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.tiimo-task-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.tiimo-task-sub {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tiimo-check {
+  appearance: none;
+  border: 1.75px solid rgba(24, 24, 27, 0.22);
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.tiimo-check[aria-pressed='true'],
+.tiimo-check.on {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
+.tiimo-check-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tiimo-fail-soft {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.tiimo-fail-soft.selected {
+  color: var(--danger);
+  background: var(--danger-soft);
+  opacity: 1;
+}
+
+/* Soft pass — no neon overload */
+.check-row.pass {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.check-row.fail {
+  border-color: transparent;
+  background: transparent;
+}
+
+.check-row.pending {
+  border-color: transparent;
+}
+
+.period-meter {
+  display: none;
+}
+
+/* Period pills in sheets */
+.tiimo-period-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.tiimo-period-pill {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 8px 6px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tiimo-period-pill.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #fff;
+}
+
+.tiimo-composer-sheet .notes-input {
+  margin-bottom: 4px;
+}
+
+.note-sheet {
+  background: #fff;
+  border-color: var(--border);
+}
+
+.note-sheet-edit {
+  background: var(--surface-2);
+}
+
+.notes-toast {
+  background: #18181b;
+  color: #fafafa;
+}
+
+.notes-toast-undo {
+  color: #86efac;
+}
+
+/* Cards airy */
+.card,
+.period-card:not(.tiimo-period) {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.habit-scoreboard {
+  background: #fff;
+  border-color: var(--border);
+}
+
+.habit-scoreboard,
+.streak-hero {
+  background: #fff;
+}
+
+.progress-view .card-head h2,
+.progress-header .tiimo-day-title {
+  font-family: var(--serif);
+}
+
+.progress-view .card-head h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.habit-rate-fill {
+  background: rgba(24, 24, 27, 0.35);
+}
+
+.habit-rate-fill.mid {
+  background: rgba(202, 138, 4, 0.45);
+}
+
+.habit-rate-fill.cold {
+  background: rgba(220, 38, 38, 0.4);
+}
+
+.score-pill {
+  background: var(--surface-2);
+  border-color: var(--border);
+  font-size: 0.78rem;
+  padding: 4px 9px;
+}
+
+.xp-chip {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-soft);
+}
+
+.streak-flame {
+  filter: none;
+  color: #f59e0b;
+}
+
+.close-day-btn {
+  background: var(--text);
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.weather-ios {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.notes-week-day {
+  border: 0;
+  background: transparent;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.notes-week-day.is-today {
+  border-color: var(--border);
+}
+
+.notes-month-cell {
+  background: var(--surface-2);
+  border-radius: 14px;
+}
+
+.notes-month-cell.active {
+  background: #fff;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.pf-btn.pass.selected {
+  box-shadow: none;
+}
+
+@media (max-width: 390px) {
+  .tiimo-day-title {
+    font-size: 1.85rem;
+  }
+}

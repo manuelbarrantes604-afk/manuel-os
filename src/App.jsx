@@ -8,12 +8,13 @@ import { useWeather } from './hooks/useWeather';
 import { useWeekWeight } from './hooks/useWeekWeight';
 import { useStreak } from './hooks/useStreak';
 import { activePeriodId } from './lib/time';
+import { iconForCheck } from './lib/tiimoIcons';
 import './App.css';
 
 const NAV = [
-  { id: 'agenda', label: 'Agenda', icon: '☐' },
-  { id: 'today', label: 'Today', icon: '○' },
-  { id: 'progress', label: 'Progress', icon: '◎' },
+  { id: 'agenda', label: 'Agenda', icon: '☰' },
+  { id: 'today', label: 'Today', icon: '◉' },
+  { id: 'progress', label: 'Progress', icon: '▦' },
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
@@ -93,10 +94,11 @@ function FlameIcon({ className = '' }) {
   );
 }
 
-/** One horizontal line: label left, Pass | Fail chips right. Neon glow on PASS. */
+/** Tiimo-style row: pastel icon · title · circular Pass check · soft Fail. */
 function CheckRow({ def, row, setStatus }) {
   const status = row?.status || 'PENDING';
   const [xpFlash, setXpFlash] = useState(false);
+  const icon = iconForCheck(def.id);
 
   useEffect(() => {
     if (!xpFlash) return undefined;
@@ -104,38 +106,52 @@ function CheckRow({ def, row, setStatus }) {
     return () => clearTimeout(t);
   }, [xpFlash]);
 
-  const onPass = () => {
-    const wasPass = status === 'PASS';
+  const onPassToggle = () => {
+    if (status === 'PASS') {
+      setStatus(def.id, 'PENDING');
+      return;
+    }
     setStatus(def.id, 'PASS');
-    if (!wasPass) setXpFlash(true);
+    setXpFlash(true);
   };
 
   return (
-    <li id={`check-${def.id}`} className={`check-row ${statusClass(status)}`}>
-      <div className="check-label">
-        <strong>{def.label}</strong>
+    <li id={`check-${def.id}`} className={`tiimo-task check-row ${statusClass(status)}`}>
+      <span
+        className="tiimo-icon"
+        style={{ background: icon.bg, width: 40, height: 40, fontSize: 17 }}
+        aria-hidden="true"
+      >
+        {icon.emoji}
+      </span>
+      <div className="tiimo-task-main check-label">
+        <strong className="tiimo-task-title">{def.label}</strong>
+        {def.target ? <span className="tiimo-task-sub">{def.target}</span> : null}
         {xpFlash ? (
           <span className="xp-flash" aria-hidden="true">
             +10 XP
           </span>
         ) : null}
       </div>
-      <div className="pf-row" role="group" aria-label={`${def.label} grade`}>
+      <div className="tiimo-check-cluster" role="group" aria-label={`${def.label} grade`}>
         <button
           type="button"
-          className={`pf-btn pass ${status === 'PASS' ? 'selected' : ''}`}
-          onClick={onPass}
-          aria-pressed={status === 'PASS'}
+          className={`tiimo-fail-soft ${status === 'FAIL' ? 'selected' : ''}`}
+          onClick={() => setStatus(def.id, status === 'FAIL' ? 'PENDING' : 'FAIL')}
+          aria-pressed={status === 'FAIL'}
+          aria-label="Fail"
+          title="Fail"
         >
-          Pass
+          ✕
         </button>
         <button
           type="button"
-          className={`pf-btn fail ${status === 'FAIL' ? 'selected' : ''}`}
-          onClick={() => setStatus(def.id, 'FAIL')}
-          aria-pressed={status === 'FAIL'}
+          className={`tiimo-check ${status === 'PASS' ? 'on' : ''}`}
+          onClick={onPassToggle}
+          aria-pressed={status === 'PASS'}
+          aria-label={status === 'PASS' ? 'Clear pass' : 'Pass'}
         >
-          Fail
+          {status === 'PASS' ? '✓' : ''}
         </button>
       </div>
     </li>
@@ -149,44 +165,32 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
   }));
   const passed = rows.filter((r) => r.row?.status === 'PASS').length;
   const total = rows.length;
-  const meterPct = total ? Math.round((passed / total) * 100) : 0;
+  const glyph = part.id === 'night' ? '☾' : '☀';
+  const label = part.id === 'night' ? 'NIGHT' : 'MORNING';
 
   return (
     <article
-      className={`period-card ${isActive ? 'period-active' : ''}`}
+      className={`tiimo-period period-card ${isActive ? 'period-active' : ''} open`}
       id={`period-${part.id}`}
     >
-      <div className="period-head">
-        <div>
-          <h2>
-            {part.title}
-            {isActive && <span className="now-badge">Now</span>}
-          </h2>
-          <p className="coach-line">{part.coachLine}</p>
+      <div className="tiimo-period-head static">
+        <div className="tiimo-period-toggle" role="heading" aria-level={2}>
+          <span className="tiimo-period-glyph" aria-hidden="true">
+            {glyph}
+          </span>
+          <span className="tiimo-period-label">
+            {label} ({passed}/{total})
+          </span>
+          {isActive ? <span className="now-badge">Now</span> : null}
         </div>
-        <span className="period-count">
-          {passed}/{total}
-        </span>
       </div>
-
-      <ul className="check-list">
+      <p className="coach-line tiimo-coach">{part.coachLine}</p>
+      <ul className="check-list tiimo-task-list">
         {rows.map(({ def, row }) => (
           <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
         ))}
       </ul>
-
       {footerSlot}
-
-      <div
-        className="period-meter"
-        role="progressbar"
-        aria-valuenow={passed}
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-label={`${part.title} passed ${passed} of ${total}`}
-      >
-        <div className="period-meter-fill" style={{ width: `${meterPct}%` }} />
-      </div>
     </article>
   );
 }
@@ -294,30 +298,28 @@ function TodayView({
 
   return (
     <div className="view today-view">
-      <header className="today-header">
-        <div className="greeting-row">
-          <div>
-            <p className="hello">{greetingForHour(ny.hour)}, Manuel</p>
-            <h1>Today</h1>
-            <p className="date-line">
-              {today?.label || 'Today'} · {today?.week || 'W—'}
-            </p>
-            {weather.metaLine ? (
-              <p className="weather-meta">{weather.metaLine}</p>
-            ) : null}
-          </div>
-          <div className="header-pills">
-            <ScorePill pct={todayPct} />
-            <span className="xp-chip" title="Lifetime XP from Pass grades">
-              Lv {streak.level} · {streak.xp} XP
+      <header className="today-header tiimo-today-header">
+        <div className="tiimo-topbar">
+          <div className="tiimo-chips">
+            <span className="tiimo-streak-chip" title="Day streak">
+              <span aria-hidden="true">🔥</span> {streak.current}
             </span>
+            <span className="tiimo-xp-chip" title="Lifetime XP">
+              ✦ {streak.xp}
+            </span>
+            <ScorePill pct={todayPct} />
           </div>
         </div>
-        <div className="streak-strip" aria-label={`${streak.current} day streak`}>
-          <FlameIcon className="streak-flame" />
-          <strong className="streak-strip-num">{streak.current}</strong>
-          <span className="streak-strip-label">day streak</span>
+        <div className="tiimo-day-head">
+          <h1 className="tiimo-day-title">Today</h1>
+          <span className="tiimo-month-link static">
+            {today?.label || 'Today'}
+          </span>
         </div>
+        <p className="hello">{greetingForHour(ny.hour)}, Manuel</p>
+        {weather.metaLine ? (
+          <p className="weather-meta">{weather.metaLine}</p>
+        ) : null}
         <p className="coach-banner">Faith · Health · Discipline · Family</p>
       </header>
 
@@ -468,16 +470,22 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
 
   return (
     <div className="view progress-view">
-      <header className="progress-header">
-        <div className="greeting-row">
-          <div>
-            <h1>Progress</h1>
-            <p className="date-line">Stay consistent · habit scoreboard</p>
+      <header className="progress-header tiimo-progress-header">
+        <div className="tiimo-topbar">
+          <div className="tiimo-chips">
+            <span className="tiimo-streak-chip" title="Day streak">
+              <span aria-hidden="true">🔥</span> {streak.current}
+            </span>
+            <span className="tiimo-xp-chip" title="Lifetime XP">
+              ✦ {streak.xp}
+            </span>
           </div>
-          <span className="xp-chip" title="Lifetime XP from Pass grades">
-            Lv {streak.level} · {streak.xp} XP
-          </span>
         </div>
+        <div className="tiimo-day-head">
+          <h1 className="tiimo-day-title">Progress</h1>
+          <span className="tiimo-month-link static">Habits</span>
+        </div>
+        <p className="date-line">Stay consistent · habit scoreboard</p>
       </header>
 
       <section className="card habit-scoreboard" aria-label="Habit consistency">
@@ -569,7 +577,7 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
       <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v19</p>
+        <p>Manuel OS · local · v20</p>
       </footer>
     </div>
   );
@@ -656,13 +664,15 @@ export default function App() {
               getItem={agenda.getItem}
               rename={agenda.rename}
               setDue={agenda.setDue}
+              setPeriod={agenda.setPeriod}
               focusComposer={focusComposer}
+              streak={streak}
             />
           )}
         </main>
       </div>
 
-      <nav className="bottom-nav tabs-3" aria-label="Main">
+      <nav className="bottom-nav tabs-3 tiimo-nav" aria-label="Main">
         {NAV.map((n) => (
           <button
             key={n.id}

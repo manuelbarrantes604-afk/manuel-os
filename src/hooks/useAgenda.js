@@ -159,16 +159,21 @@ export function useAgenda(todayKey) {
   }, [items]);
 
   const add = useCallback(
-    (title, due) => {
+    (title, due, period) => {
       const t = String(title || '').trim();
       if (!t) return;
       const dueDate = due || todayKey;
+      const p =
+        period === 'morning' || period === 'afternoon' || period === 'evening'
+          ? period
+          : 'afternoon';
       setItems((prev) => [
         {
           id: uid(),
           title: t,
           due: dueDate,
           month: null,
+          period: p,
           done: false,
           doneAt: null,
           createdAt: new Date().toISOString(),
@@ -230,6 +235,16 @@ export function useAgenda(todayKey) {
           ? { ...it, due: due || null, month: due ? null : it.month }
           : it,
       ),
+    );
+  }, []);
+
+  const setPeriod = useCallback((id, period) => {
+    const p =
+      period === 'morning' || period === 'afternoon' || period === 'evening'
+        ? period
+        : 'afternoon';
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, period: p } : it)),
     );
   }, []);
 
@@ -315,6 +330,7 @@ export function useAgenda(todayKey) {
     getItem,
     rename,
     setDue,
+    setPeriod,
   };
 }
 
