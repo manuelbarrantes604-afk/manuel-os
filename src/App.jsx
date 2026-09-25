@@ -7,6 +7,7 @@ import { useAgenda } from './hooks/useAgenda';
 import { useWeather } from './hooks/useWeather';
 import { useWeight } from './hooks/useWeight';
 import { useWeekWeight } from './hooks/useWeekWeight';
+import { useStreak } from './hooks/useStreak';
 import { activePeriodId } from './lib/time';
 import './App.css';
 
@@ -74,19 +75,57 @@ function NumberField({ id, label, unit, value, onChange, min, max, step, placeho
   );
 }
 
-/** One horizontal line: label left, Pass | Fail chips right. */
+/** Flame icon for streak accents (inline SVG, light UI). */
+function FlameIcon({ className = '' }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M12 2c.4 2.2-.3 3.9-1.5 5.3C9 9 7.5 10.1 7.1 12.2c-.3 1.6.2 3.1 1.3 4.2-.9-.3-1.6-1-2-1.9-.2 2.4 1 4.7 3.1 5.9 2.3 1.3 5.2 1.1 7.3-.5 2.3-1.8 3.2-4.8 2.3-7.5-.6-1.8-1.8-3.2-2.8-4.7C14.9 5.7 14 3.9 12 2zm0 7.5c.7 1.1 1.6 2.1 2.1 3.4.6 1.5.4 3.2-.7 4.4-1.1 1.2-2.9 1.5-4.4.8-1.4-.7-2.2-2.2-2-3.8.2-1.4 1.2-2.4 2.1-3.4.6-.7 1.4-1.5 2.9-1.4z"
+      />
+    </svg>
+  );
+}
+
+/** One horizontal line: label left, Pass | Fail chips right. Neon glow on PASS. */
 function CheckRow({ def, row, setStatus }) {
   const status = row?.status || 'PENDING';
+  const [xpFlash, setXpFlash] = useState(false);
+
+  useEffect(() => {
+    if (!xpFlash) return undefined;
+    const t = setTimeout(() => setXpFlash(false), 1000);
+    return () => clearTimeout(t);
+  }, [xpFlash]);
+
+  const onPass = () => {
+    const wasPass = status === 'PASS';
+    setStatus(def.id, 'PASS');
+    if (!wasPass) setXpFlash(true);
+  };
+
   return (
     <li id={`check-${def.id}`} className={`check-row ${statusClass(status)}`}>
       <div className="check-label">
         <strong>{def.label}</strong>
+        {xpFlash ? (
+          <span className="xp-flash" aria-hidden="true">
+            +10 XP
+          </span>
+        ) : null}
       </div>
       <div className="pf-row" role="group" aria-label={`${def.label} grade`}>
         <button
           type="button"
           className={`pf-btn pass ${status === 'PASS' ? 'selected' : ''}`}
-          onClick={() => setStatus(def.id, 'PASS')}
+          onClick={onPass}
           aria-pressed={status === 'PASS'}
         >
           Pass
@@ -109,8 +148,9 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
     def: CHECK_BY_ID[id],
     row: today.checks[id],
   }));
-  const done = rows.filter((r) => r.row?.status !== 'PENDING').length;
+  const passed = rows.filter((r) => r.row?.status === 'PASS').length;
   const total = rows.length;
+  const meterPct = total ? Math.round((passed / total) * 100) : 0;
 
   return (
     <article
@@ -126,7 +166,7 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
           <p className="coach-line">{part.coachLine}</p>
         </div>
         <span className="period-count">
-          {done}/{total}
+          {passed}/{total}
         </span>
       </div>
 
@@ -137,6 +177,17 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
       </ul>
 
       {footerSlot}
+
+      <div
+        className="period-meter"
+        role="progressbar"
+        aria-valuenow={passed}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={`${part.title} passed ${passed} of ${total}`}
+      >
+        <div className="period-meter-fill" style={{ width: `${meterPct}%` }} />
+      </div>
     </article>
   );
 }
@@ -240,6 +291,7 @@ function TodayView({
   closeDay,
   ny,
   weather,
+  streak,
 }) {
   const activePart = activePeriodId(ny.hour);
 
@@ -257,7 +309,17 @@ function TodayView({
               <p className="weather-meta">{weather.metaLine}</p>
             ) : null}
           </div>
-          <ScorePill pct={todayPct} />
+          <div className="header-pills">
+            <ScorePill pct={todayPct} />
+            <span className="xp-chip" title="Lifetime XP from Pass grades">
+              Lv {streak.level} · {streak.xp} XP
+            </span>
+          </div>
+        </div>
+        <div className="streak-strip" aria-label={`${streak.current} day streak`}>
+          <FlameIcon className="streak-flame" />
+          <strong className="streak-strip-num">{streak.current}</strong>
+          <span className="streak-strip-label">day streak</span>
         </div>
         <p className="coach-banner">
           Faith · Health · Discipline · Family · Execution
@@ -497,7 +559,7 @@ function WeekWeightCard({ weekWeight, weight }) {
   );
 }
 
-function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
+function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight, streak }) {
   const { startWeight, currentWeight, stats: weightStats } = weight;
   const { startLbs, endLbs } = weekWeight.stats;
 
@@ -530,9 +592,64 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
   return (
     <div className="view progress-view">
       <header className="progress-header">
-        <h1>Progress</h1>
-        <p className="date-line">Honesty · week cut · north stars</p>
+        <div className="greeting-row">
+          <div>
+            <h1>Progress</h1>
+            <p className="date-line">Streak · honesty · week cut · goals</p>
+          </div>
+          <span className="xp-chip" title="Lifetime XP from Pass grades">
+            Lv {streak.level} · {streak.xp} XP
+          </span>
+        </div>
       </header>
+
+      <section className="card streak-hero" aria-label="Your streak">
+        <div className="streak-hero-top">
+          <FlameIcon className="streak-flame streak-flame-lg" />
+          <div className="streak-hero-num">{streak.current}</div>
+          <p className="streak-hero-label">Day streak</p>
+        </div>
+        <div className="streak-hero-stats">
+          <div className="streak-stat">
+            <strong>{streak.longest}</strong>
+            <span>Longest streak</span>
+          </div>
+          <div className="streak-stat-divider" aria-hidden="true" />
+          <div className="streak-stat">
+            <strong>{streak.lastActivityLabel}</strong>
+            <span>Last activity</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="card streak-rules-card">
+        <div className="card-head">
+          <h2>What counts as a streak?</h2>
+        </div>
+        <ul className="streak-rules-list">
+          <li>
+            <span className="streak-rule-mark" aria-hidden="true">
+              ✓
+            </span>
+            <span>Wake 5:00 Pass</span>
+          </li>
+          <li>
+            <span className="streak-rule-mark" aria-hidden="true">
+              ✓
+            </span>
+            <span>Leave 5:30 Pass</span>
+          </li>
+          <li>
+            <span className="streak-rule-mark" aria-hidden="true">
+              ✓
+            </span>
+            <span>Exercise 6:00 Pass</span>
+          </li>
+        </ul>
+        <p className="streak-rules-copy">
+          All three must Pass. Miss a day and the streak resets to zero.
+        </p>
+      </section>
 
       <section className="card honesty-card">
         <div className="card-head">
@@ -571,6 +688,29 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
         </ul>
       </section>
 
+      <section className="card streak-cal-card" aria-label="Last 14 days">
+        <div className="card-head">
+          <h2>Last 14 days</h2>
+          <span className="card-sub">Morning stack</span>
+        </div>
+        <div className="streak-cal">
+          {streak.calendar.map((d) => (
+            <div
+              key={d.key}
+              className={`streak-cal-cell${d.earned ? ' earned' : ''}${d.today ? ' today' : ''}`}
+              title={`${d.key}${d.earned ? ' · earned' : ' · miss'}`}
+            >
+              <span className="streak-cal-dow">{d.dow}</span>
+              {d.earned ? (
+                <FlameIcon className="streak-flame streak-flame-sm" />
+              ) : (
+                <span className="streak-cal-dot" aria-hidden="true" />
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {latestReview?.review?.ran && (
         <section className="card review-simple">
           <div className="card-head">
@@ -587,7 +727,7 @@ function ProgressView({ weekHonesty, days, todayKey, weight, weekWeight }) {
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local only · v14</p>
+        <p>Manuel OS · local only · v15</p>
       </footer>
     </div>
   );
@@ -605,6 +745,7 @@ export default function App() {
     setStatus,
     closeDay,
   } = useCheckins();
+  const streak = useStreak(days, todayKey);
   const weight = useWeight();
   const weekWeight = useWeekWeight(todayKey);
   const weather = useWeather(ny.hour);
@@ -645,6 +786,7 @@ export default function App() {
               closeDay={closeDay}
               ny={ny}
               weather={weather}
+              streak={streak}
             />
           )}
           {tab === 'progress' && (
@@ -654,6 +796,7 @@ export default function App() {
               todayKey={todayKey}
               weight={weight}
               weekWeight={weekWeight}
+              streak={streak}
             />
           )}
           {tab === 'agenda' && (
