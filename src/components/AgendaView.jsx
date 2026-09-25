@@ -7,100 +7,37 @@ const SpeechRecognitionAPI =
     ? window.SpeechRecognition || window.webkitSpeechRecognition
     : null;
 
-function NoteRow({
-  item,
-  onToggle,
-  onRemove,
-  onRename,
-  onStartMove,
-  moving,
-  compact,
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(item.title);
-  const inputRef = useRef(null);
+const UNDO_LIMIT = 20;
+const TOAST_MS = 4500;
 
-  useEffect(() => {
-    if (editing) inputRef.current?.focus();
-  }, [editing]);
-
-  useEffect(() => {
-    setDraft(item.title);
-  }, [item.title]);
-
-  const commit = () => {
-    const t = draft.trim();
-    if (t && t !== item.title) onRename(item.id, t);
-    else setDraft(item.title);
-    setEditing(false);
-  };
-
+function NoteRow({ item, onToggle, onOpen, moving, compact }) {
   return (
     <li
       className={`note-row ${item.done ? 'done' : ''} ${moving ? 'moving' : ''} ${compact ? 'compact' : ''}`}
-      draggable={!editing}
+      draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', item.id);
         e.dataTransfer.effectAllowed = 'move';
-        onStartMove?.(item.id, { silent: true });
       }}
-      onDragEnd={() => onStartMove?.(null)}
     >
       <button
         type="button"
         className="note-check"
         aria-label={item.done ? 'Mark open' : 'Mark done'}
         aria-pressed={item.done}
-        onClick={() => onToggle(item.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(item.id);
+        }}
       >
         {item.done ? '✓' : ''}
       </button>
-      <div className="note-main">
-        {editing ? (
-          <input
-            ref={inputRef}
-            className="note-edit"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                commit();
-              }
-              if (e.key === 'Escape') {
-                setDraft(item.title);
-                setEditing(false);
-              }
-            }}
-            aria-label="Edit note"
-          />
-        ) : (
-          <button
-            type="button"
-            className="note-title-btn"
-            onClick={() => setEditing(true)}
-          >
-            {item.title}
-          </button>
-        )}
-      </div>
       <button
         type="button"
-        className={`note-move ${moving ? 'active' : ''}`}
-        aria-label={`Move ${item.title}`}
-        aria-pressed={moving}
-        onClick={() => onStartMove?.(moving ? null : item.id)}
+        className="note-title-btn"
+        onClick={() => onOpen(item)}
       >
-        Move
-      </button>
-      <button
-        type="button"
-        className="note-del"
-        aria-label={`Delete ${item.title}`}
-        onClick={() => onRemove(item.id)}
-      >
-        ×
+        {item.title}
       </button>
     </li>
   );
@@ -128,7 +65,6 @@ function DayStrip({
   todayKey,
   itemsForDate,
   onSelectDay,
-  moveTarget,
   onDropDay,
   emphasize,
 }) {
@@ -144,7 +80,7 @@ function DayStrip({
         const active = d.key === selectedDay;
         const n = (itemsForDate(d.key) || []).filter((i) => !i.done).length;
         const dow = formatAgendaDayParts(d.key).weekday.slice(0, 3);
-        const dropLit = dragOver === d.key || (emphasize && moveTarget === d.key);
+        const dropLit = dragOver === d.key;
         return (
           <button
             key={d.key}
@@ -176,6 +112,117 @@ function DayStrip({
   );
 }
 
+function NoteSheet({
+  item,
+  draft,
+  setDraft,
+  onClose,
+  onSave,
+  onMove,
+  onRemove,
+  todayKey,
+}) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!item) return undefined;
+    const t = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select?.();
+    });
+    return () => cancelAnimationFrame(t);
+  }, [item?.id]);
+
+  if (!item) return null;
+
+  const parts = formatAgendaDayParts(item.due || todayKey);
+  const label = item.due === todayKey ? 'Today' : parts.weekday;
+
+  const commitAndClose = () => {
+    onSave(draft);
+    onClose();
+  };
+
+  return (
+    <div className="note-sheet-root" role="presentation">
+      <button
+        type="button"
+        className="note-sheet-backdrop"
+        aria-label="Close note"
+        onClick={commitAndClose}
+      />
+      <div className="note-sheet" role="dialog" aria-modal="true" aria-label="Note">
+        <div className="note-sheet-handle" aria-hidden="true" />
+        <textarea
+          ref={inputRef}
+          className="note-sheet-edit"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={3}
+          aria-label="Note text"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              commitAndClose();
+            }
+          }}
+        />
+        <div className="note-sheet-actions">
+          <button
+            type="button"
+            className="note-sheet-btn move"
+            onClick={() => {
+              onSave(draft);
+              onMove();
+            }}
+          >
+            Move
+          </button>
+          <button
+            type="button"
+            className="note-sheet-btn danger"
+            onClick={onRemove}
+          >
+            Remove
+          </button>
+          <button type="button" className="note-sheet-btn done" onClick={commitAndClose}>
+            Done
+          </button>
+        </div>
+        <p className="note-sheet-meta">
+          {label} · {parts.date}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function UndoToast({ toast, onUndo, onDismiss }) {
+  if (!toast) return null;
+  return (
+    <div className="notes-toast" role="status" aria-live="polite">
+      <span>{toast.message}</span>
+      {toast.canUndo ? (
+        <button type="button" className="notes-toast-undo" onClick={onUndo}>
+          Undo
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="notes-toast-dismiss"
+        aria-label="Dismiss"
+        onClick={onDismiss}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function AgendaView({
   todayKey,
   overdue,
@@ -185,22 +232,37 @@ export default function AgendaView({
   add,
   toggle,
   remove,
+  restore,
+  getItem,
   rename,
   setDue,
   focusComposer,
 }) {
-  const [mode, setMode] = useState('day'); // day | week
+  const [mode, setMode] = useState('day');
   const [selectedDay, setSelectedDay] = useState(todayKey);
   const [title, setTitle] = useState('');
   const [listening, setListening] = useState(false);
   const [movingId, setMovingId] = useState(null);
+  const [sheetItem, setSheetItem] = useState(null);
+  const [sheetDraft, setSheetDraft] = useState('');
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const [toast, setToast] = useState(null);
   const titleRef = useRef(null);
   const recognitionRef = useRef(null);
+  const toastTimer = useRef(null);
+  const cacheRef = useRef(new Map());
   const speechSupported = Boolean(SpeechRecognitionAPI);
 
   const week = useMemo(() => weekStripFor(todayKey), [todayKey]);
   const weekKeys = useMemo(() => week.map((d) => d.key), [week]);
   const weekLabel = useMemo(() => weekRangeLabel(week), [week]);
+
+  const remember = (it) => {
+    if (it?.id) cacheRef.current.set(it.id, { ...it });
+  };
+
+  const lookup = (id) => getItem?.(id) || cacheRef.current.get(id) || null;
 
   useEffect(() => {
     setSelectedDay(todayKey);
@@ -222,6 +284,7 @@ export default function AgendaView({
       } catch {
         /* ignore */
       }
+      if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
 
@@ -235,15 +298,19 @@ export default function AgendaView({
     return list;
   }, [itemsForDate, selectedDay, todayKey, overdue]);
 
+  useEffect(() => {
+    for (const it of dayItems) remember(it);
+  }, [dayItems]);
+
   const weekSections = useMemo(() => {
     return week.map((d) => {
       const items = itemsForWeekDay
         ? itemsForWeekDay(d.key, weekKeys)
         : itemsForDate(d.key) || [];
-      const parts = formatAgendaDayParts(d.key);
+      const dayParts = formatAgendaDayParts(d.key);
       return {
         key: d.key,
-        parts,
+        parts: dayParts,
         isToday: d.key === todayKey,
         items,
         openCount: items.filter((i) => !i.done).length,
@@ -251,9 +318,136 @@ export default function AgendaView({
     });
   }, [week, weekKeys, itemsForWeekDay, itemsForDate, todayKey]);
 
+  useEffect(() => {
+    for (const sec of weekSections) {
+      for (const it of sec.items) remember(it);
+    }
+  }, [weekSections]);
+
   const openCount = dayItems.filter((i) => !i.done).length;
   const parts = formatAgendaDayParts(selectedDay);
   const isToday = selectedDay === todayKey;
+
+  const showToast = (message, canUndo = true) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, canUndo });
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
+  };
+
+  const pushUndo = (entry) => {
+    setUndoStack((prev) => [...prev.slice(-(UNDO_LIMIT - 1)), entry]);
+    setRedoStack([]);
+  };
+
+  const applyMove = (id, dayKey, opts = {}) => {
+    if (!id || !dayKey) return;
+    const current = lookup(id);
+    const fromDue = current?.due ?? null;
+    if (fromDue === dayKey) {
+      setMovingId(null);
+      return;
+    }
+    if (!opts.silent && current) {
+      pushUndo({
+        type: 'move',
+        id,
+        fromDue,
+        toDue: dayKey,
+        item: { ...current },
+      });
+      showToast('Moved');
+    }
+    setDue?.(id, dayKey);
+    setSelectedDay(dayKey);
+    setMovingId(null);
+    if (current) remember({ ...current, due: dayKey });
+  };
+
+  const doRemove = (item) => {
+    if (!item?.id) return;
+    remember(item);
+    pushUndo({ type: 'delete', item: { ...item } });
+    remove(item.id);
+    setSheetItem(null);
+    setMovingId((m) => (m === item.id ? null : m));
+    showToast('Note deleted');
+  };
+
+  const doRename = (item, nextTitle, opts = {}) => {
+    const t = String(nextTitle || '').trim();
+    if (!item?.id || !t || t === item.title) return false;
+    if (!opts.silent) {
+      pushUndo({
+        type: 'rename',
+        id: item.id,
+        fromTitle: item.title,
+        toTitle: t,
+      });
+    }
+    rename(item.id, t);
+    remember({ ...item, title: t });
+    return true;
+  };
+
+  const applyUndoEntry = (entry) => {
+    if (!entry) return;
+    if (entry.type === 'delete') {
+      restore?.(entry.item);
+      remember(entry.item);
+      if (entry.item?.due) setSelectedDay(entry.item.due);
+      return;
+    }
+    if (entry.type === 'move') {
+      setDue?.(entry.id, entry.fromDue);
+      const cur = lookup(entry.id);
+      if (cur) remember({ ...cur, due: entry.fromDue });
+      if (entry.fromDue) setSelectedDay(entry.fromDue);
+      return;
+    }
+    if (entry.type === 'rename') {
+      rename(entry.id, entry.fromTitle);
+      const cur = lookup(entry.id);
+      if (cur) remember({ ...cur, title: entry.fromTitle });
+    }
+  };
+
+  const applyRedoEntry = (entry) => {
+    if (!entry) return;
+    if (entry.type === 'delete') {
+      remove(entry.item.id);
+      return;
+    }
+    if (entry.type === 'move') {
+      setDue?.(entry.id, entry.toDue);
+      const cur = lookup(entry.id);
+      if (cur) remember({ ...cur, due: entry.toDue });
+      if (entry.toDue) setSelectedDay(entry.toDue);
+      return;
+    }
+    if (entry.type === 'rename') {
+      rename(entry.id, entry.toTitle);
+      const cur = lookup(entry.id);
+      if (cur) remember({ ...cur, title: entry.toTitle });
+    }
+  };
+
+  const undo = () => {
+    const entry = undoStack[undoStack.length - 1];
+    if (!entry) return;
+    setUndoStack((prev) => prev.slice(0, -1));
+    setRedoStack((r) => [...r, entry]);
+    applyUndoEntry(entry);
+    showToast('Undone', false);
+  };
+
+  const redo = () => {
+    const entry = redoStack[redoStack.length - 1];
+    if (!entry) return;
+    setRedoStack((prev) => prev.slice(0, -1));
+    setUndoStack((u) => [...u, entry]);
+    applyRedoEntry(entry);
+    showToast('Redone', false);
+  };
 
   const submit = (e) => {
     e?.preventDefault?.();
@@ -264,15 +458,9 @@ export default function AgendaView({
     titleRef.current?.focus();
   };
 
-  const applyMove = (id, dayKey) => {
-    if (!id || !dayKey) return;
-    setDue?.(id, dayKey);
-    setSelectedDay(dayKey);
-    setMovingId(null);
-  };
-
   const startMove = (id) => {
     setMovingId(id);
+    setSheetItem(null);
   };
 
   const onSelectDay = (dayKey) => {
@@ -283,6 +471,13 @@ export default function AgendaView({
     }
     setSelectedDay(dayKey);
     titleRef.current?.focus();
+  };
+
+  const openSheet = (item) => {
+    remember(item);
+    setSheetItem(item);
+    setSheetDraft(item.title);
+    setMovingId(null);
   };
 
   const toggleMic = () => {
@@ -377,6 +572,26 @@ export default function AgendaView({
           autoComplete="off"
         />
         <div className="notes-composer-actions">
+          <button
+            type="button"
+            className="notes-undo-btn"
+            disabled={!undoStack.length}
+            onClick={undo}
+            aria-label="Undo"
+            title="Undo"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="notes-undo-btn"
+            disabled={!redoStack.length}
+            onClick={redo}
+            aria-label="Redo"
+            title="Redo"
+          >
+            Redo
+          </button>
           <MicButton
             supported={speechSupported}
             listening={listening}
@@ -394,14 +609,13 @@ export default function AgendaView({
         todayKey={todayKey}
         itemsForDate={itemsForDate}
         onSelectDay={onSelectDay}
-        moveTarget={null}
-        onDropDay={applyMove}
+        onDropDay={(id, dayKey) => applyMove(id, dayKey)}
         emphasize={Boolean(movingId)}
       />
 
       {movingId ? (
-        <p className="notes-move-hint" role="status">
-          Tap a day above to move · or drag onto a day
+        <p className="notes-move-hint soft" role="status">
+          Choose a day
         </p>
       ) : null}
 
@@ -420,9 +634,7 @@ export default function AgendaView({
                   key={it.id}
                   item={it}
                   onToggle={toggle}
-                  onRemove={remove}
-                  onRename={rename}
-                  onStartMove={startMove}
+                  onOpen={openSheet}
                   moving={movingId === it.id}
                 />
               ))}
@@ -456,9 +668,7 @@ export default function AgendaView({
                       key={it.id}
                       item={it}
                       onToggle={toggle}
-                      onRemove={remove}
-                      onRename={rename}
-                      onStartMove={startMove}
+                      onOpen={openSheet}
                       moving={movingId === it.id}
                       compact
                     />
@@ -471,8 +681,34 @@ export default function AgendaView({
       )}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v17</p>
+        <p>Manuel OS · local · v18</p>
       </footer>
+
+      <NoteSheet
+        item={sheetItem}
+        draft={sheetDraft}
+        setDraft={setSheetDraft}
+        todayKey={todayKey}
+        onClose={() => setSheetItem(null)}
+        onSave={(draft) => {
+          if (sheetItem) doRename(sheetItem, draft);
+        }}
+        onMove={() => {
+          if (sheetItem) startMove(sheetItem.id);
+        }}
+        onRemove={() => {
+          if (sheetItem) doRemove(sheetItem);
+        }}
+      />
+
+      <UndoToast
+        toast={toast}
+        onUndo={() => {
+          undo();
+          setToast(null);
+        }}
+        onDismiss={() => setToast(null)}
+      />
     </div>
   );
 }

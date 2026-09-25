@@ -488,7 +488,7 @@ function ProgressView({ weekHonesty, weekWeight, streak }) {
       <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v17</p>
+        <p>Manuel OS · local · v18</p>
       </footer>
     </div>
   );
@@ -569,6 +569,8 @@ export default function App() {
               add={agenda.add}
               toggle={agenda.toggle}
               remove={agenda.remove}
+              restore={agenda.restore}
+              getItem={agenda.getItem}
               rename={agenda.rename}
               setDue={agenda.setDue}
               focusComposer={focusComposer}

@@ -199,6 +199,22 @@ export function useAgenda(todayKey) {
     setItems((prev) => prev.filter((it) => it.id !== id));
   }, []);
 
+  /** Re-insert a full item snapshot (for undo of delete). */
+  const restore = useCallback((item) => {
+    if (!item?.id) return;
+    setItems((prev) => {
+      if (prev.some((it) => it.id === item.id)) {
+        return prev.map((it) => (it.id === item.id ? { ...item } : it));
+      }
+      return [{ ...item }, ...prev];
+    });
+  }, []);
+
+  const getItem = useCallback(
+    (id) => items.find((it) => it.id === id) || null,
+    [items],
+  );
+
   const rename = useCallback((id, title) => {
     const t = String(title || '').trim();
     if (!t) return;
@@ -295,6 +311,8 @@ export function useAgenda(todayKey) {
     add,
     toggle,
     remove,
+    restore,
+    getItem,
     rename,
     setDue,
   };
