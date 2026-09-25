@@ -3404,7 +3404,7 @@
   color: var(--green-dark);
 }
 
-/* ========== v20 Tiimo-inspired calm UI ========== */
+/* ========== v20/v21 Tiimo-inspired calm UI ========== */
 
 .mos-shell {
   background: var(--bg);
@@ -3829,18 +3829,73 @@
   background: transparent;
   flex: 1;
   min-width: 0;
+  min-height: 48px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 2px;
+  margin: 0;
   cursor: pointer;
   text-align: left;
   font: inherit;
   color: inherit;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  border-radius: 12px;
 }
+
+.tiimo-task-main:active {
+  background: rgba(24, 24, 27, 0.04);
+}
+
+.tiimo-task-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tiimo-edit-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  min-height: 36px;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.tiimo-edit-btn:hover,
+.tiimo-edit-btn:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+  outline: none;
+}
+
+.tiimo-edit-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.tiimo-edit-label {
+  line-height: 1;
+}
+
+
 
 .tiimo-task-title {
   font-size: 0.95rem;

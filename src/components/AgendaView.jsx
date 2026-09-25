@@ -100,6 +100,26 @@ function PastelIcon({ title, size = 40 }) {
 }
 
 function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
+  const longTimer = useRef(null);
+  const longFired = useRef(false);
+  const pressOrigin = useRef(null);
+
+  const clearLongPress = () => {
+    if (longTimer.current) {
+      clearTimeout(longTimer.current);
+      longTimer.current = null;
+    }
+    pressOrigin.current = null;
+  };
+
+  const openEdit = (e) => {
+    e?.stopPropagation?.();
+    clearLongPress();
+    onOpen(item);
+  };
+
+  useEffect(() => () => clearLongPress(), []);
+
   return (
     <li
       className={`tiimo-task ${item.done ? 'done' : ''} ${moving ? 'moving' : ''}`}
@@ -113,16 +133,61 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
           : undefined
       }
     >
-      <PastelIcon title={item.title} />
       <button
         type="button"
         className="tiimo-task-main"
+        aria-label={`Edit note: ${item.title}`}
         onClick={(e) => {
           e.stopPropagation();
+          if (longFired.current) {
+            longFired.current = false;
+            return;
+          }
           onOpen(item);
         }}
+        onPointerDown={(e) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          longFired.current = false;
+          clearLongPress();
+          pressOrigin.current = { x: e.clientX, y: e.clientY };
+          longTimer.current = setTimeout(() => {
+            longFired.current = true;
+            pressOrigin.current = null;
+            onOpen(item);
+          }, 480);
+        }}
+        onPointerMove={(e) => {
+          const o = pressOrigin.current;
+          if (!o || !longTimer.current) return;
+          const dx = Math.abs(e.clientX - o.x);
+          const dy = Math.abs(e.clientY - o.y);
+          if (dx > 10 || dy > 10) clearLongPress();
+        }}
+        onPointerUp={clearLongPress}
+        onPointerLeave={clearLongPress}
+        onPointerCancel={clearLongPress}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openEdit(e);
+        }}
       >
-        <strong className="tiimo-task-title">{item.title}</strong>
+        <PastelIcon title={item.title} />
+        <span className="tiimo-task-copy">
+          <strong className="tiimo-task-title">{item.title}</strong>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="tiimo-edit-btn"
+        aria-label={`Edit ${item.title}`}
+        title="Edit"
+        onClick={openEdit}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <span className="tiimo-edit-glyph" aria-hidden="true">
+          ✎
+        </span>
+        <span className="tiimo-edit-label">Edit</span>
       </button>
       <button
         type="button"
@@ -134,7 +199,10 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
           e.preventDefault();
           onToggle(item.id);
         }}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          clearLongPress();
+        }}
       >
         {item.done ? '✓' : ''}
       </button>
@@ -151,7 +219,10 @@ function PeriodGroup({ period, items, open, onToggleOpen, onAdd, onToggle, onOpe
         <button
           type="button"
           className="tiimo-period-toggle"
-          onClick={onToggleOpen}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleOpen();
+          }}
           aria-expanded={open}
         >
           <span className="tiimo-period-glyph" aria-hidden="true">
@@ -1161,7 +1232,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v20</p>
+        <p>Manuel OS · local · v21</p>
       </footer>
 
       <NoteSheet

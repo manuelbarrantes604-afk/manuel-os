@@ -577,7 +577,7 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
       <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v20</p>
+        <p>Manuel OS · local · v21</p>
       </footer>
     </div>
   );
