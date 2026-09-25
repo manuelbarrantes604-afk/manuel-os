@@ -5,8 +5,8 @@
   "start_url": "/manuel-os/",
   "scope": "/manuel-os/",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#fafafa",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/manuel-os/favicon.svg",
