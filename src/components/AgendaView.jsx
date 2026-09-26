@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatAgendaDayParts, weekStripFor } from '../lib/time';
-import { addDays, monthLabel } from '../hooks/useAgenda';
+import { addDays, byOrder, monthLabel } from '../hooks/useAgenda';
 import {
   PERIODS,
   iconForTitle,
@@ -99,7 +99,7 @@ function PastelIcon({ title, size = 40 }) {
   );
 }
 
-function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
+function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
   const longTimer = useRef(null);
   const longFired = useRef(false);
   const pressOrigin = useRef(null);
@@ -119,6 +119,45 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
   };
 
   useEffect(() => () => clearLongPress(), []);
+
+  if (reorder) {
+    return (
+      <li className={`tiimo-task reordering ${item.done ? 'done' : ''}`}>
+        <div className="tiimo-task-main static" aria-hidden="false">
+          <PastelIcon title={item.title} />
+          <span className="tiimo-task-copy">
+            <strong className="tiimo-task-title">{item.title}</strong>
+          </span>
+        </div>
+        <div className="tiimo-order-btns" role="group" aria-label={`Reorder ${item.title}`}>
+          <button
+            type="button"
+            className="tiimo-order-btn up"
+            aria-label={`Move ${item.title} up`}
+            disabled={reorder.isFirst}
+            onClick={(e) => {
+              e.stopPropagation();
+              reorder.onUp(item.id);
+            }}
+          >
+            <span aria-hidden="true">▲</span>
+          </button>
+          <button
+            type="button"
+            className="tiimo-order-btn down"
+            aria-label={`Move ${item.title} down`}
+            disabled={reorder.isLast}
+            onClick={(e) => {
+              e.stopPropagation();
+              reorder.onDown(item.id);
+            }}
+          >
+            <span aria-hidden="true">▼</span>
+          </button>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li
@@ -210,11 +249,28 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag }) {
   );
 }
 
-function PeriodGroup({ period, items, open, onToggleOpen, onAdd, onToggle, onOpen, movingId, canDrag }) {
+function PeriodGroup({
+  period,
+  items,
+  open,
+  onToggleOpen,
+  onAdd,
+  onToggle,
+  onOpen,
+  movingId,
+  canDrag,
+  reordering,
+  onStartReorder,
+  onEndReorder,
+  onMoveItem,
+}) {
   const count = items.length;
   const meta = PERIODS.find((p) => p.id === period) || PERIODS[1];
+  const niceLabel = meta.label.charAt(0) + meta.label.slice(1).toLowerCase();
   return (
-    <section className={`tiimo-period ${open ? 'open' : 'closed'}`}>
+    <section
+      className={`tiimo-period ${open ? 'open' : 'closed'} ${reordering ? 'reordering' : ''}`}
+    >
       <div className="tiimo-period-head">
         <button
           type="button"
@@ -235,14 +291,42 @@ function PeriodGroup({ period, items, open, onToggleOpen, onAdd, onToggle, onOpe
             {open ? '▾' : '▸'}
           </span>
         </button>
-        <button
-          type="button"
-          className="tiimo-period-add"
-          aria-label={`Add to ${meta.label.toLowerCase()}`}
-          onClick={onAdd}
-        >
-          +
-        </button>
+        {reordering ? (
+          <button
+            type="button"
+            className="tiimo-reorder-done"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEndReorder();
+            }}
+          >
+            Done
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="tiimo-reorder-toggle"
+              aria-label={`Reorder ${niceLabel}`}
+              title={`Reorder ${niceLabel}`}
+              disabled={count < 2}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartReorder();
+              }}
+            >
+              <span aria-hidden="true">⇅</span>
+            </button>
+            <button
+              type="button"
+              className="tiimo-period-add"
+              aria-label={`Add to ${meta.label.toLowerCase()}`}
+              onClick={onAdd}
+            >
+              +
+            </button>
+          </>
+        )}
       </div>
       {open ? (
         <div className="tiimo-period-body">
@@ -250,14 +334,24 @@ function PeriodGroup({ period, items, open, onToggleOpen, onAdd, onToggle, onOpe
             <p className="tiimo-period-empty">Nothing here</p>
           ) : (
             <ul className="tiimo-task-list">
-              {items.map((it) => (
+              {items.map((it, idx) => (
                 <NoteRow
                   key={it.id}
                   item={it}
                   onToggle={onToggle}
                   onOpen={onOpen}
                   moving={movingId === it.id}
-                  canDrag={canDrag}
+                  canDrag={canDrag && !reordering}
+                  reorder={
+                    reordering
+                      ? {
+                          isFirst: idx === 0,
+                          isLast: idx === items.length - 1,
+                          onUp: (id) => onMoveItem(id, -1),
+                          onDown: (id) => onMoveItem(id, 1),
+                        }
+                      : null
+                  }
                 />
               ))}
             </ul>
@@ -355,6 +449,8 @@ function NoteSheet({
   onMove,
   onRemove,
   todayKey,
+  orderInfo,
+  onShift,
 }) {
   const inputRef = useRef(null);
 
@@ -428,6 +524,24 @@ function NoteSheet({
               {p.label.charAt(0) + p.label.slice(1).toLowerCase()}
             </button>
           ))}
+        </div>
+        <div className="note-sheet-order" role="group" aria-label="Order in section">
+          <button
+            type="button"
+            className="note-sheet-btn order"
+            disabled={!orderInfo?.canUp || period !== orderInfo?.period}
+            onClick={() => onShift(-1)}
+          >
+            <span aria-hidden="true">▲</span> Move up
+          </button>
+          <button
+            type="button"
+            className="note-sheet-btn order"
+            disabled={!orderInfo?.canDown || period !== orderInfo?.period}
+            onClick={() => onShift(1)}
+          >
+            <span aria-hidden="true">▼</span> Move down
+          </button>
         </div>
         <div className="note-sheet-actions">
           <button
@@ -569,6 +683,7 @@ export default function AgendaView({
   rename,
   setDue,
   setPeriod,
+  setOrders,
   focusComposer,
   streak,
 }) {
@@ -586,6 +701,7 @@ export default function AgendaView({
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [toast, setToast] = useState(null);
+  const [reorderPeriod, setReorderPeriod] = useState(null);
   const [openPeriods, setOpenPeriods] = useState({
     morning: true,
     afternoon: true,
@@ -668,8 +784,15 @@ export default function AgendaView({
       const p = inferPeriod(it.title, it.period);
       buckets[p].push(it);
     }
+    // v22: user-controlled order within each section (stable sort).
+    for (const key of Object.keys(buckets)) buckets[key].sort(byOrder);
     return buckets;
   }, [dayItems]);
+
+  // Leave reorder mode when the day or view changes.
+  useEffect(() => {
+    setReorderPeriod(null);
+  }, [selectedDay, mode]);
 
   const weekSections = useMemo(() => {
     const strip = weekStripFor(anchorKey);
@@ -773,8 +896,58 @@ export default function AgendaView({
     return true;
   };
 
+  /** Move an item one step within its displayed section on the selected day. */
+  const shiftInSection = (period, id, dir) => {
+    const list = grouped[period] || [];
+    const idx = list.findIndex((it) => it.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= list.length) return;
+    const nextList = list.slice();
+    [nextList[idx], nextList[target]] = [nextList[target], nextList[idx]];
+    // Reuse the section's existing order values (strictly increasing) so the
+    // section's position relative to everything else is untouched.
+    const vals = list
+      .map((it, i) => (typeof it.order === 'number' && Number.isFinite(it.order) ? it.order : i))
+      .sort((a, b) => a - b);
+    for (let i = 1; i < vals.length; i += 1) {
+      if (vals[i] <= vals[i - 1]) vals[i] = vals[i - 1] + 0.001;
+    }
+    const from = {};
+    const to = {};
+    list.forEach((it) => {
+      from[it.id] = typeof it.order === 'number' ? it.order : null;
+    });
+    nextList.forEach((it, i) => {
+      to[it.id] = vals[i];
+    });
+    pushUndo({ type: 'reorder', from, to, day: selectedDay, period });
+    setOrders?.(to);
+    for (const it of list) {
+      const cur = lookup(it.id);
+      if (cur) remember({ ...cur, order: to[it.id] });
+    }
+    showToast(dir < 0 ? 'Moved up' : 'Moved down');
+  };
+
+  const applyOrderEntry = (entry, map) => {
+    const clean = {};
+    for (const [k, v] of Object.entries(map || {})) {
+      if (typeof v === 'number') clean[k] = v;
+    }
+    setOrders?.(clean);
+    if (entry.day) {
+      setSelectedDay(entry.day);
+      setAnchorKey(entry.day);
+    }
+    if (entry.period) setOpenPeriods((prev) => ({ ...prev, [entry.period]: true }));
+  };
+
   const applyUndoEntry = (entry) => {
     if (!entry) return;
+    if (entry.type === 'reorder') {
+      applyOrderEntry(entry, entry.from);
+      return;
+    }
     if (entry.type === 'delete') {
       restore?.(entry.item);
       remember(entry.item);
@@ -804,6 +977,10 @@ export default function AgendaView({
 
   const applyRedoEntry = (entry) => {
     if (!entry) return;
+    if (entry.type === 'reorder') {
+      applyOrderEntry(entry, entry.to);
+      return;
+    }
     if (entry.type === 'delete') {
       remove(entry.item.id);
       return;
@@ -965,6 +1142,16 @@ export default function AgendaView({
       setListening(false);
     }
   };
+
+  const sheetOrderInfo = (() => {
+    if (!sheetItem) return null;
+    const live = lookup(sheetItem.id) || sheetItem;
+    const p = inferPeriod(live.title, live.period);
+    const list = grouped[p] || [];
+    const idx = list.findIndex((it) => it.id === sheetItem.id);
+    if (idx < 0) return { period: p, canUp: false, canDown: false };
+    return { period: p, canUp: idx > 0, canDown: idx < list.length - 1 };
+  })();
 
   const weekNavLabel = weekRangePretty(
     weekStripFor(mode === 'week' ? anchorKey : selectedDay),
@@ -1144,6 +1331,14 @@ export default function AgendaView({
               onOpen={openSheet}
               movingId={movingId}
               canDrag={canDrag}
+              reordering={reorderPeriod === p.id}
+              onStartReorder={() => {
+                setMovingId(null);
+                setReorderPeriod(p.id);
+                setOpenPeriods((prev) => ({ ...prev, [p.id]: true }));
+              }}
+              onEndReorder={() => setReorderPeriod(null)}
+              onMoveItem={(id, dir) => shiftInSection(p.id, id, dir)}
             />
           ))}
         </div>
@@ -1232,7 +1427,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v21</p>
+        <p>Manuel OS · local · v22</p>
       </footer>
 
       <NoteSheet
@@ -1251,6 +1446,10 @@ export default function AgendaView({
         }}
         onRemove={() => {
           if (sheetItem) doRemove(sheetItem);
+        }}
+        orderInfo={sheetOrderInfo}
+        onShift={(dir) => {
+          if (sheetItem && sheetOrderInfo) shiftInSection(sheetOrderInfo.period, sheetItem.id, dir);
         }}
       />
 

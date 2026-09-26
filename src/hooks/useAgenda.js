@@ -21,7 +21,49 @@ function daysInMonth(year, month /* 1-12 */) {
   return new Date(Date.UTC(year, month, 0, 12)).getUTCDate();
 }
 
+/**
+ * v22: every item carries a numeric `order`. Sections render sorted by it.
+ * Migration assigns a global ordinal matching the v21 display order
+ * (earlier due first — so rolled-over items stay on top — then open before
+ * done, then title), so nothing jumps on first load.
+ */
+function hasOrder(it) {
+  return typeof it?.order === 'number' && Number.isFinite(it.order);
+}
+
+export function ensureOrder(list) {
+  if (!Array.isArray(list)) return list;
+  if (list.every(hasOrder)) return list;
+  let next =
+    list.reduce((m, it) => (hasOrder(it) ? Math.max(m, it.order) : m), -1) + 1;
+  const missing = list
+    .filter((it) => !hasOrder(it))
+    .sort((a, b) => {
+      const da = a.due || '9999-99-99';
+      const db = b.due || '9999-99-99';
+      if (da !== db) return da < db ? -1 : 1;
+      if (Boolean(a.done) !== Boolean(b.done)) return a.done ? 1 : -1;
+      return String(a.title || '').localeCompare(String(b.title || ''));
+    });
+  const assigned = new Map();
+  for (const it of missing) {
+    assigned.set(it, next);
+    next += 1;
+  }
+  return list.map((it) => (assigned.has(it) ? { ...it, order: assigned.get(it) } : it));
+}
+
+export function byOrder(a, b) {
+  const oa = hasOrder(a) ? a.order : Number.MAX_SAFE_INTEGER;
+  const ob = hasOrder(b) ? b.order : Number.MAX_SAFE_INTEGER;
+  return oa - ob;
+}
+
 function loadItems() {
+  return ensureOrder(loadItemsRaw());
+}
+
+function loadItemsRaw() {
   try {
     const raw = localStorage.getItem(AGENDA_STORAGE_KEY);
     if (raw) {
@@ -170,6 +212,8 @@ export function useAgenda(todayKey) {
       setItems((prev) => [
         {
           id: uid(),
+          order:
+            prev.reduce((m, it) => (hasOrder(it) ? Math.max(m, it.order) : m), -1) + 1,
           title: t,
           due: dueDate,
           month: null,
@@ -211,8 +255,20 @@ export function useAgenda(todayKey) {
       if (prev.some((it) => it.id === item.id)) {
         return prev.map((it) => (it.id === item.id ? { ...item } : it));
       }
-      return [{ ...item }, ...prev];
+      return ensureOrder([{ ...item }, ...prev]);
     });
+  }, []);
+
+  /** Apply an { id: order } map (in-section reordering + its undo/redo). */
+  const setOrders = useCallback((orderMap) => {
+    if (!orderMap) return;
+    setItems((prev) =>
+      prev.map((it) =>
+        Object.prototype.hasOwnProperty.call(orderMap, it.id)
+          ? { ...it, order: orderMap[it.id] }
+          : it,
+      ),
+    );
   }, []);
 
   const getItem = useCallback(
@@ -262,10 +318,7 @@ export function useAgenda(todayKey) {
   const itemsForDate = useCallback(
     (dateKey) => {
       const list = items.filter((it) => it.due === dateKey);
-      return list.sort((a, b) => {
-        if (a.done !== b.done) return a.done ? 1 : -1;
-        return a.title.localeCompare(b.title);
-      });
+      return list.sort(byOrder);
     },
     [items],
   );
@@ -331,6 +384,7 @@ export function useAgenda(todayKey) {
     rename,
     setDue,
     setPeriod,
+    setOrders,
   };
 }
 
