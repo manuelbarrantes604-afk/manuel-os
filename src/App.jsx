@@ -9,6 +9,14 @@ import { useWeekWeight } from './hooks/useWeekWeight';
 import { useStreak } from './hooks/useStreak';
 import { activePeriodId } from './lib/time';
 import { iconForCheck } from './lib/tiimoIcons';
+import {
+  MorningProofCard,
+  PhotoProofRow,
+  PhotoViewer,
+  ProofTapRow,
+  useProofPhoto,
+} from './components/MorningProof';
+import { fmtMinutes } from './lib/proof';
 import './App.css';
 
 const NAV = [
@@ -158,7 +166,7 @@ function CheckRow({ def, row, setStatus }) {
   );
 }
 
-function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
+function PeriodCard({ part, today, setStatus, isActive, footerSlot, renderRow }) {
   const rows = part.checkIds.map((id) => ({
     def: CHECK_BY_ID[id],
     row: today.checks[id],
@@ -186,9 +194,11 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot }) {
       </div>
       <p className="coach-line tiimo-coach">{part.coachLine}</p>
       <ul className="check-list tiimo-task-list">
-        {rows.map(({ def, row }) => (
-          <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
-        ))}
+        {rows.map(({ def, row }) =>
+          renderRow?.(def, row) || (
+            <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
+          ),
+        )}
       </ul>
       {footerSlot}
     </article>
@@ -293,8 +303,40 @@ function TodayView({
   ny,
   weather,
   streak,
+  todayKey,
+  proofSince,
+  logProof,
+  clearProof,
+  setExercisePhoto,
 }) {
   const activePart = activePeriodId(ny.hour);
+  const [view, setView] = useState(null);
+  const photo = useProofPhoto(todayKey, today?.checks?.exercise, {
+    setExercisePhoto,
+    clearProof,
+  });
+  const rulesApply = Boolean(proofSince) && todayKey >= proofSince;
+  const now = new Date();
+  const openView = (url, takenAt) => setView({ url, takenAt });
+  const renderMorningRow = (def, row) => {
+    if (def.id === 'wake' || def.id === 'leave') {
+      return (
+        <ProofTapRow
+          key={def.id}
+          checkId={def.id}
+          def={def}
+          row={row}
+          now={now}
+          onLog={(id) => logProof(id, new Date())}
+          onClear={(id) => clearProof(id, todayKey)}
+        />
+      );
+    }
+    if (def.id === 'exercise') {
+      return <PhotoProofRow key={def.id} def={def} row={row} photo={photo} onView={openView} />;
+    }
+    return null;
+  };
 
   return (
     <div className="view today-view">
@@ -323,6 +365,14 @@ function TodayView({
         <p className="coach-banner">Faith · Health · Discipline · Family</p>
       </header>
 
+      <MorningProofCard
+        today={today}
+        photoUrl={photo.url}
+        earned={streak.todayEarned}
+        rulesApply={rulesApply}
+        onView={openView}
+      />
+
       <WeatherCard
         locId={weather.locId}
         setLocId={weather.setLocId}
@@ -348,6 +398,7 @@ function TodayView({
             today={today}
             setStatus={setStatus}
             isActive={activePart === part.id}
+            renderRow={part.id === 'morning' ? renderMorningRow : undefined}
             footerSlot={
               part.id === 'night' ? (
                 <CloseDayButton
@@ -360,6 +411,12 @@ function TodayView({
           />
         ))}
       </div>
+
+      <footer className="mos-footer">
+        <p>Manuel OS · local · v23</p>
+      </footer>
+
+      <PhotoViewer view={view} onClose={() => setView(null)} />
     </div>
   );
 }
@@ -505,7 +562,7 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
           </div>
         </div>
         <p className="habit-earn-line">
-          Streak = wake + leave + exercise Pass. Miss resets to 0.
+          Streak = up by 5:10 + leaving by 5:40 + workout photo. Late or missing resets to 0.
         </p>
       </section>
 
@@ -519,7 +576,7 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
             <div
               key={d.key}
               className={`streak-cal-cell${d.earned ? ' earned' : ''}${d.today ? ' today' : ''}`}
-              title={`${d.key}${d.earned ? ' · earned' : ' · miss'}`}
+              title={`${d.key}${d.earned ? ' · earned' : ' · miss'}${d.wakeAt ? ` · up ${new Date(d.wakeAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}${d.leaveAt ? ` · left ${new Date(d.leaveAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`}
             >
               <span className="streak-cal-dow">{d.dow}</span>
               <span className="streak-cal-num">{d.dayNum}</span>
@@ -531,6 +588,16 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
             </div>
           ))}
         </div>
+        {streak.proofTimes &&
+        (streak.proofTimes.wakeCount || streak.proofTimes.leaveCount) ? (
+          <p className="proof-avg-line">
+            Last 7 days · avg up{' '}
+            <strong>{fmtMinutes(streak.proofTimes.avgWake)}</strong>
+            {' · '}avg left <strong>{fmtMinutes(streak.proofTimes.avgLeave)}</strong>
+            {' · '}
+            {streak.proofTimes.photoCount} photo{streak.proofTimes.photoCount === 1 ? '' : 's'}
+          </p>
+        ) : null}
       </section>
 
       {rates.some((r) => r.graded > 0) ? (
@@ -577,7 +644,7 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
       <WeekWeightCard weekWeight={weekWeight} />
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v22</p>
+        <p>Manuel OS · local · v23</p>
       </footer>
     </div>
   );
@@ -595,8 +662,12 @@ export default function App() {
     ny,
     setStatus,
     closeDay,
+    proofSince,
+    logProof,
+    clearProof,
+    setExercisePhoto,
   } = useCheckins();
-  const streak = useStreak(days, todayKey);
+  const streak = useStreak(days, todayKey, proofSince);
   const weekWeight = useWeekWeight(todayKey);
   const weather = useWeather(ny.hour);
   const agenda = useAgenda(todayKey);
@@ -639,6 +710,11 @@ export default function App() {
               ny={ny}
               weather={weather}
               streak={streak}
+              todayKey={todayKey}
+              proofSince={proofSince}
+              logProof={logProof}
+              clearProof={clearProof}
+              setExercisePhoto={setExercisePhoto}
             />
           )}
           {tab === 'progress' && (

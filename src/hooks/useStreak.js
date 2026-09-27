@@ -14,9 +14,40 @@ function shiftDateKey(dateKey, deltaDays) {
   return dt.toISOString().slice(0, 10);
 }
 
-function dayEarned(day) {
+/**
+ * v23: from `proofSince` onward a day is earned only with proof —
+ * Wake + Leave logged on time (a tap, not a self-pass) and an Exercise photo.
+ * Earlier days keep their original self-graded result.
+ */
+function dayEarned(day, key, proofSince) {
   if (!day?.checks) return false;
-  return STREAK_CHECK_IDS.every((id) => day.checks[id]?.status === 'PASS');
+  const c = day.checks;
+  if (proofSince && key && key >= proofSince) {
+    return (
+      c.wake?.status === 'PASS' &&
+      Boolean(c.wake?.loggedAt) &&
+      !c.wake?.late &&
+      c.leave?.status === 'PASS' &&
+      Boolean(c.leave?.loggedAt) &&
+      !c.leave?.late &&
+      c.exercise?.status === 'PASS' &&
+      Boolean(c.exercise?.photo)
+    );
+  }
+  return STREAK_CHECK_IDS.every((id) => c[id]?.status === 'PASS');
+}
+
+function minutesOf(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function avg(list) {
+  const xs = list.filter((x) => x != null);
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
 /** Compact activity label: Today / Yesterday / Mon 9/22 */
@@ -38,13 +69,13 @@ export function activityLabel(dateKey, todayKey) {
  * Earn day iff wake + leave + exercise are all PASS.
  * XP = count of PASS statuses across all days × 10 (deterministic).
  */
-export function useStreak(days, todayKey) {
+export function useStreak(days, todayKey, proofSince) {
   return useMemo(() => {
     const earnedKeys = new Set();
     let passCount = 0;
 
     for (const [key, day] of Object.entries(days || {})) {
-      if (dayEarned(day)) earnedKeys.add(key);
+      if (dayEarned(day, key, proofSince)) earnedKeys.add(key);
       if (day?.checks) {
         for (const def of CHECK_DEFS) {
           if (day.checks[def.id]?.status === 'PASS') passCount += 1;
@@ -105,14 +136,28 @@ export function useStreak(days, todayKey) {
         timeZone: 'UTC',
         weekday: 'narrow',
       });
+      const c = days?.[key]?.checks;
       calendar.push({
         key,
         dow,
         dayNum: d,
         earned: earnedKeys.has(key),
         today: key === todayKey,
+        wakeAt: c?.wake?.loggedAt || null,
+        leaveAt: c?.leave?.loggedAt || null,
+        hasPhoto: Boolean(c?.exercise?.photo),
       });
     }
+
+    // Logged proof times: last 7 days incl. today (avg minutes since midnight).
+    const last7 = calendar.slice(-7);
+    const proofTimes = {
+      avgWake: avg(last7.map((d) => minutesOf(d.wakeAt))),
+      avgLeave: avg(last7.map((d) => minutesOf(d.leaveAt))),
+      wakeCount: last7.filter((d) => d.wakeAt).length,
+      leaveCount: last7.filter((d) => d.leaveAt).length,
+      photoCount: last7.filter((d) => d.hasPhoto).length,
+    };
 
     return {
       current,
@@ -124,9 +169,11 @@ export function useStreak(days, todayKey) {
       xp,
       level,
       calendar,
+      proofTimes,
+      proofSince,
       xpPerPass: XP_PER_PASS,
     };
-  }, [days, todayKey]);
+  }, [days, todayKey, proofSince]);
 }
 
 export { shiftDateKey, dayEarned, XP_PER_PASS };

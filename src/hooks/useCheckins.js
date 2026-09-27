@@ -7,6 +7,43 @@ import {
   STORAGE_KEY,
 } from '../data/seed';
 import { getNyParts, weekStripFor } from '../lib/time';
+import {
+  PROOF_SINCE_KEY,
+  fmtClock,
+  isOnTime,
+  localDateKey,
+} from '../lib/proof';
+
+const PROOF_IDS = ['wake', 'leave', 'exercise'];
+
+function shiftKeyLocal(dateKey, delta) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * v23: first date the proof rules apply. Stored once in its own key.
+ * If today already has self-graded morning checks (pre-v23), today keeps the
+ * old rules and proof rules start tomorrow, so no existing result changes.
+ */
+function loadProofSince(days, todayKey) {
+  try {
+    const saved = localStorage.getItem(PROOF_SINCE_KEY);
+    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
+    const t = days?.[todayKey];
+    const selfGraded = PROOF_IDS.some((id) => {
+      const row = t?.checks?.[id];
+      return row && row.status !== 'PENDING' && !row.loggedAt && !row.photo;
+    });
+    const since = selfGraded ? shiftKeyLocal(todayKey, 1) : todayKey;
+    localStorage.setItem(PROOF_SINCE_KEY, since);
+    return since;
+  } catch {
+    return todayKey;
+  }
+}
 
 function cloneSeed() {
   const seeded = structuredClone(SEED_DAYS);
@@ -134,7 +171,32 @@ function habitRatesFor(days, keys) {
 }
 
 export function useCheckins() {
-  const ny = useMemo(() => getNyParts(), []);
+  // v23: keep "today" fresh — the home-screen app can sit in memory overnight.
+  const [ny, setNy] = useState(() => getNyParts());
+  useEffect(() => {
+    const tick = () =>
+      setNy((prev) => {
+        const next = getNyParts();
+        return next.dateKey === prev.dateKey &&
+          next.hour === prev.hour &&
+          next.minute === prev.minute
+          ? prev
+          : next;
+      });
+    const id = setInterval(tick, 30000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', tick);
+    window.addEventListener('pageshow', tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', tick);
+      window.removeEventListener('pageshow', tick);
+    };
+  }, []);
   const todayKey = ny.dateKey;
 
   const [days, setDays] = useState(() => {
@@ -158,6 +220,77 @@ export function useCheckins() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(days));
   }, [days]);
 
+  const [proofSince] = useState(() => loadProofSince(days, todayKey));
+
+  /** Write one check row onto a given day (creating the day if needed). */
+  const writeRow = useCallback((dateKey, checkId, makeRow) => {
+    setDays((prev) => {
+      const day = migrateDay(prev[dateKey] || blankDay(dateKey));
+      const nextChecks = {
+        ...day.checks,
+        [checkId]: makeRow(day.checks[checkId] || {}),
+      };
+      const stats = calcDayStats(nextChecks, day.closed);
+      return {
+        ...prev,
+        [dateKey]: {
+          ...day,
+          closed: day.closed || stats.allGraded,
+          checks: nextChecks,
+        },
+      };
+    });
+  }, []);
+
+  /** Wake / Leave proof tap: exact time, on-time vs Late on the phone clock. */
+  const logProof = useCallback(
+    (checkId, at = new Date()) => {
+      const onTime = isOnTime(checkId, at);
+      const dateKey = localDateKey(at);
+      writeRow(dateKey, checkId, () => ({
+        status: onTime ? 'PASS' : 'FAIL',
+        time: fmtClock(at.toISOString()),
+        note: onTime ? 'On time' : 'Late',
+        loggedAt: at.toISOString(),
+        late: !onTime,
+        proof: 'tap',
+      }));
+      return { onTime, dateKey };
+    },
+    [writeRow],
+  );
+
+  const clearProof = useCallback(
+    (checkId, dateKey = todayKey) => {
+      writeRow(dateKey, checkId, () => ({
+        status: 'PENDING',
+        time: '—',
+        note: 'Cleared',
+      }));
+    },
+    [writeRow, todayKey],
+  );
+
+  /** Exercise PASS requires a stored photo. meta: { takenAt, loggedAt, width, height } */
+  const setExercisePhoto = useCallback(
+    (dateKey, meta) => {
+      writeRow(dateKey, 'exercise', () => ({
+        status: 'PASS',
+        time: fmtClock(meta.takenAt),
+        note: 'Photo proof',
+        loggedAt: meta.loggedAt,
+        photo: {
+          takenAt: meta.takenAt,
+          loggedAt: meta.loggedAt,
+          width: meta.width,
+          height: meta.height,
+        },
+        proof: 'photo',
+      }));
+    },
+    [writeRow],
+  );
+
   const today = days[todayKey];
 
   const todayPct = useMemo(
@@ -172,7 +305,7 @@ export function useCheckins() {
 
   const setStatus = useCallback(
     (checkId, status) => {
-      if (status !== 'PASS' && status !== 'FAIL') return;
+      if (status !== 'PASS' && status !== 'FAIL' && status !== 'PENDING') return;
       setDays((prev) => {
         const day = prev[todayKey] || blankDay(todayKey);
         const prevRow = day.checks[checkId] || {};
@@ -181,8 +314,13 @@ export function useCheckins() {
           [checkId]: {
             ...prevRow,
             status,
-            time: nowTime(),
-            note: status === 'PASS' ? 'Marked pass' : 'Marked fail',
+            time: status === 'PENDING' ? '—' : nowTime(),
+            note:
+              status === 'PASS'
+                ? 'Marked pass'
+                : status === 'FAIL'
+                  ? 'Marked fail'
+                  : 'Not graded yet',
           },
         };
         const stats = calcDayStats(nextChecks, day.closed);
@@ -323,6 +461,10 @@ export function useCheckins() {
     ny,
     setStatus,
     closeDay,
+    proofSince,
+    logProof,
+    clearProof,
+    setExercisePhoto,
   };
 }
 
