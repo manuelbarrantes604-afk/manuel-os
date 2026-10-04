@@ -5,7 +5,10 @@ import AgendaView from './components/AgendaView';
 import { useCheckins } from './hooks/useCheckins';
 import { useAgenda } from './hooks/useAgenda';
 import { useWeather } from './hooks/useWeather';
-import { useWeekWeight } from './hooks/useWeekWeight';
+import { useDailyWeight } from './hooks/useDailyWeight';
+import { useNotebook } from './hooks/useNotebook';
+import { WeightEntry, WeightWeekCard } from './components/Weight';
+import NotesView from './components/NotesView';
 import { useStreak } from './hooks/useStreak';
 import { activePeriodId } from './lib/time';
 import { iconForCheck } from './lib/tiimoIcons';
@@ -21,6 +24,7 @@ import './App.css';
 
 const NAV = [
   { id: 'agenda', label: 'Agenda', icon: '☰' },
+  { id: 'notes', label: 'Notes', icon: '✎' },
   { id: 'today', label: 'Today', icon: '◉' },
   { id: 'progress', label: 'Progress', icon: '▦' },
 ];
@@ -53,33 +57,6 @@ function ScorePill({ pct }) {
     <span className={`score-pill tone-${tone}`}>
       {pct == null ? '—' : `${pct}%`}
     </span>
-  );
-}
-
-function NumberField({ id, label, unit, value, onChange, min, max, step, placeholder }) {
-  return (
-    <div className="number-field">
-      <label htmlFor={id}>
-        <span className="nf-label">{label}</span>
-        <span className="nf-unit">{unit}</span>
-      </label>
-      <input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        step={step ?? 1}
-        min={min}
-        max={max}
-        placeholder={placeholder ?? '—'}
-        value={value === '' || value == null ? '' : value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={(e) => {
-          const v = e.target.value.trim();
-          onChange(v === '' ? '' : v);
-        }}
-        aria-label={`${label} in ${unit}`}
-      />
-    </div>
   );
 }
 
@@ -308,6 +285,7 @@ function TodayView({
   logProof,
   clearProof,
   setExercisePhoto,
+  weight,
 }) {
   const activePart = activePeriodId(ny.hour);
   const [view, setView] = useState(null);
@@ -401,78 +379,37 @@ function TodayView({
             renderRow={part.id === 'morning' ? renderMorningRow : undefined}
             footerSlot={
               part.id === 'night' ? (
-                <CloseDayButton
-                  todayStats={todayStats}
-                  closed={Boolean(today?.closed)}
-                  onClose={closeDay}
+                <div className="night-close-stack">
+                  <WeightEntry
+                    slot="pm"
+                    entry={weight.today.pm}
+                    compareTo={weight.today.am}
+                    onSave={(slot, v) => weight.setWeight(todayKey, slot, v)}
+                  />
+                  <CloseDayButton
+                    todayStats={todayStats}
+                    closed={Boolean(today?.closed)}
+                    onClose={closeDay}
+                  />
+                </div>
+              ) : (
+                <WeightEntry
+                  slot="am"
+                  entry={weight.today.am}
+                  onSave={(slot, v) => weight.setWeight(todayKey, slot, v)}
                 />
-              ) : null
+              )
             }
           />
         ))}
       </div>
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v23</p>
+        <p>Manuel OS · local · v24</p>
       </footer>
 
       <PhotoViewer view={view} onClose={() => setView(null)} />
     </div>
-  );
-}
-
-function WeekWeightCard({ weekWeight }) {
-  const { stats, setWeekStart, setWeekEnd } = weekWeight;
-  const { startLbs, endLbs, lost, windowLabel } = stats;
-
-  let changeLine = '—';
-  let changeTone = 'muted';
-  if (startLbs != null && endLbs != null && lost != null) {
-    if (lost > 0) {
-      changeLine = `−${lost.toFixed(1)} lbs`;
-      changeTone = 'hot';
-    } else if (lost < 0) {
-      changeLine = `+${Math.abs(lost).toFixed(1)} lbs`;
-      changeTone = 'cold';
-    } else {
-      changeLine = '0.0 lbs';
-      changeTone = 'mid';
-    }
-  }
-
-  return (
-    <section className="card week-weight-card">
-      <div className="card-head">
-        <h2>Week weight</h2>
-        <span className="card-sub">Fri → Fri</span>
-      </div>
-      {windowLabel ? <p className="ww-window">{windowLabel}</p> : null}
-      <div className="ww-fields">
-        <NumberField
-          id="week-weight-start"
-          label="Start"
-          unit="lbs"
-          value={startLbs ?? ''}
-          onChange={setWeekStart}
-          min={50}
-          max={500}
-          step={0.1}
-          placeholder="—"
-        />
-        <NumberField
-          id="week-weight-end"
-          label="End"
-          unit="lbs"
-          value={endLbs ?? ''}
-          onChange={setWeekEnd}
-          min={50}
-          max={500}
-          step={0.1}
-          placeholder="—"
-        />
-      </div>
-      <p className={`ww-reduction tone-${changeTone}`}>{changeLine}</p>
-    </section>
   );
 }
 
@@ -488,7 +425,7 @@ function shortHabitLabel(label) {
   return map[label] || label;
 }
 
-function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
+function ProgressView({ weekHonesty, weight, streak, habitInsights }) {
   const honestyTone =
     weekHonesty.avg == null
       ? 'muted'
@@ -548,8 +485,10 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
       <section className="card habit-scoreboard" aria-label="Habit consistency">
         <div className="habit-score-grid">
           <div className="habit-score">
-            <FlameIcon className="streak-flame" />
-            <strong>{streak.current}</strong>
+            <strong>
+              <FlameIcon className="streak-flame" />
+              {streak.current}
+            </strong>
             <span>Current streak</span>
           </div>
           <div className="habit-score">
@@ -565,6 +504,8 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
           Streak = up by 5:10 + leaving by 5:40 + workout photo. Late or missing resets to 0.
         </p>
       </section>
+
+      <WeightWeekCard weekFor={weight.weekFor} />
 
       <section className="card streak-cal-card" aria-label="Last 14 days">
         <div className="card-head">
@@ -641,10 +582,8 @@ function ProgressView({ weekHonesty, weekWeight, streak, habitInsights }) {
         </section>
       ) : null}
 
-      <WeekWeightCard weekWeight={weekWeight} />
-
       <footer className="mos-footer">
-        <p>Manuel OS · local · v23</p>
+        <p>Manuel OS · local · v24</p>
       </footer>
     </div>
   );
@@ -668,7 +607,8 @@ export default function App() {
     setExercisePhoto,
   } = useCheckins();
   const streak = useStreak(days, todayKey, proofSince);
-  const weekWeight = useWeekWeight(todayKey);
+  const weight = useDailyWeight(todayKey);
+  const notebook = useNotebook();
   const weather = useWeather(ny.hour);
   const agenda = useAgenda(todayKey);
   const [tab, setTab] = useState('agenda');
@@ -680,9 +620,7 @@ export default function App() {
 
   const tabDone = {
     today: Boolean(today?.closed) || Boolean(todayStats?.allGraded),
-    progress: Boolean(
-      weekWeight.stats.startLbs != null || weekWeight.stats.endLbs != null,
-    ),
+    progress: weight.thisWeekLogged,
     agenda: agenda.tended,
   };
 
@@ -697,7 +635,7 @@ export default function App() {
   }
 
   return (
-    <div className="mos-shell">
+    <div className={`mos-shell tab-${tab}`}>
       <div className="mos-frame">
         <main className="mos-main">
           {tab === 'today' && (
@@ -715,16 +653,18 @@ export default function App() {
               logProof={logProof}
               clearProof={clearProof}
               setExercisePhoto={setExercisePhoto}
+              weight={weight}
             />
           )}
           {tab === 'progress' && (
             <ProgressView
               weekHonesty={weekHonesty}
-              weekWeight={weekWeight}
+              weight={weight}
               streak={streak}
               habitInsights={habitInsights}
             />
           )}
+          {tab === 'notes' && <NotesView notebook={notebook} />}
           {tab === 'agenda' && (
             <AgendaView
               todayKey={todayKey}
@@ -749,7 +689,7 @@ export default function App() {
         </main>
       </div>
 
-      <nav className="bottom-nav tabs-3 tiimo-nav" aria-label="Main">
+      <nav className="bottom-nav tabs-4 tiimo-nav" aria-label="Main">
         {NAV.map((n) => (
           <button
             key={n.id}

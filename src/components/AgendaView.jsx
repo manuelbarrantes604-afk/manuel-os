@@ -1427,7 +1427,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v23</p>
+        <p>Manuel OS · local · v24</p>
       </footer>
 
       <NoteSheet
