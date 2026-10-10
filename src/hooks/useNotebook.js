@@ -47,14 +47,23 @@ export function useNotebook() {
   const [saveError, setSaveError] = useState(false);
   const timer = useRef(null);
   const latest = useRef(nb);
+  const pending = useRef(false);
+  const first = useRef(true);
 
   // Debounced persist (long notes) + flush on hide/unload.
   useEffect(() => {
     latest.current = nb;
+    if (first.current) {
+      // Don't rewrite storage just because the tab opened (only seed if missing).
+      first.current = false;
+      if (localStorage.getItem(NOTEBOOK_KEY)) return;
+    }
+    pending.current = true;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
         localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(nb));
+        pending.current = false;
         setSaveError(false);
       } catch {
         setSaveError(true);
@@ -64,8 +73,10 @@ export function useNotebook() {
 
   useEffect(() => {
     const flush = () => {
+      if (!pending.current) return; // only write unsaved edits
       try {
         localStorage.setItem(NOTEBOOK_KEY, JSON.stringify(latest.current));
+        pending.current = false;
       } catch {
         /* ignore */
       }
@@ -181,7 +192,21 @@ export function useNotebook() {
     });
   }, []);
 
+  /** Put a page's content back exactly (Undo changes) — keeps its old edit time. */
+  const restoreContent = useCallback((id, snap) => {
+    if (!snap) return;
+    setNb((p) => ({
+      ...p,
+      pages: p.pages.map((pg) =>
+        pg.id === id
+          ? { ...pg, title: snap.title, body: snap.body, updatedAt: snap.updatedAt || pg.updatedAt }
+          : pg,
+      ),
+    }));
+  }, []);
+
   return {
+    restoreContent,
     sections: nb.sections,
     pages: nb.pages,
     saveError,

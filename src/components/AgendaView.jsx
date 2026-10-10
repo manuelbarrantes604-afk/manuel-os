@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { formatAgendaDayParts, weekStripFor } from '../lib/time';
+import { formatAgendaDayParts, rollingStrip } from '../lib/time';
 import { addDays, byOrder, monthLabel } from '../hooks/useAgenda';
 import {
   PERIODS,
@@ -386,14 +386,33 @@ function DayStrip({
   onSelectDay,
   onDropDay,
   emphasize,
+  onPrev,
+  onNext,
 }) {
   const [dragOver, setDragOver] = useState(null);
+  const swipe = useRef(null);
 
   return (
     <div
-      className={`tiimo-week-strip ${emphasize ? 'move-ready' : ''}`}
+      className={`tiimo-week-strip v25 ${emphasize ? 'move-ready' : ''}`}
       role="tablist"
       aria-label={emphasize ? 'Pick a day to move' : 'Week'}
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        swipe.current = { x: t.clientX, y: t.clientY };
+      }}
+      onTouchEnd={(e) => {
+        const o = swipe.current;
+        swipe.current = null;
+        if (!o) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - o.x;
+        const dy = t.clientY - o.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          if (dx < 0) onNext?.();
+          else onPrev?.();
+        }
+      }}
     >
       {week.map((d) => {
         const active = d.key === selectedDay;
@@ -406,7 +425,8 @@ function DayStrip({
             type="button"
             role="tab"
             aria-selected={active}
-            className={`tiimo-week-day ${active ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''} ${dropLit ? 'drop-lit' : ''}`}
+            className={`tiimo-week-day ${active ? 'active' : ''} ${d.key === todayKey ? 'is-today' : ''} ${d.key < todayKey ? 'past' : ''} ${dropLit ? 'drop-lit' : ''}`}
+            aria-label={`${d.dow} ${Number(d.key.slice(5, 7))}/${Number(d.key.slice(8))}${d.key === todayKey ? ', today' : ''}${n ? `, ${n} open` : ''}`}
             onClick={() => onSelectDay(d.key)}
             onDragOver={(e) => {
               e.preventDefault();
@@ -421,7 +441,7 @@ function DayStrip({
               if (id) onDropDay(id, d.key);
             }}
           >
-            <span className="tiimo-week-letter">{letter}</span>
+            <span className="tiimo-week-letter">{d.key === todayKey ? 'Today' : active ? d.dow : letter}</span>
             <span className="tiimo-week-num">{Number(d.key.slice(8))}</span>
             {active || n > 0 ? (
               <span
@@ -690,6 +710,7 @@ export default function AgendaView({
   const [mode, setMode] = useState('day');
   const [selectedDay, setSelectedDay] = useState(todayKey);
   const [anchorKey, setAnchorKey] = useState(todayKey);
+  const [stripStart, setStripStart] = useState(todayKey);
   const [title, setTitle] = useState('');
   const [composePeriod, setComposePeriod] = useState('afternoon');
   const [composerOpen, setComposerOpen] = useState(false);
@@ -722,7 +743,8 @@ export default function AgendaView({
     redoRef.current = redoStack;
   }, [redoStack]);
 
-  const week = useMemo(() => weekStripFor(selectedDay), [selectedDay]);
+  // v25: the strip starts on the day being opened (today first, then forward).
+  const week = useMemo(() => rollingStrip(stripStart, todayKey), [stripStart, todayKey]);
   const monthYm = useMemo(() => anchorKey.slice(0, 7), [anchorKey]);
   const monthTitle = useMemo(() => monthLabel(monthYm), [monthYm]);
   const grid = useMemo(() => monthGrid(monthYm), [monthYm]);
@@ -735,7 +757,16 @@ export default function AgendaView({
   useEffect(() => {
     setSelectedDay(todayKey);
     setAnchorKey(todayKey);
+    setStripStart(todayKey);
   }, [todayKey]);
+
+  // If the selected day leaves the visible 7-day window (undo, month pick,
+  // move), re-anchor the strip so that day is first on the left.
+  useEffect(() => {
+    if (selectedDay < stripStart || selectedDay > addDays(stripStart, 6)) {
+      setStripStart(selectedDay);
+    }
+  }, [selectedDay, stripStart]);
 
   useEffect(() => {
     if (focusComposer) {
@@ -795,7 +826,7 @@ export default function AgendaView({
   }, [selectedDay, mode]);
 
   const weekSections = useMemo(() => {
-    const strip = weekStripFor(anchorKey);
+    const strip = rollingStrip(stripStart, todayKey);
     const keys = strip.map((d) => d.key);
     return strip.map((d) => {
       const items = itemsForWeekDay
@@ -810,7 +841,7 @@ export default function AgendaView({
         openCount: items.filter((i) => !i.done).length,
       };
     });
-  }, [anchorKey, itemsForWeekDay, itemsForDate, todayKey]);
+  }, [stripStart, itemsForWeekDay, itemsForDate, todayKey]);
 
   useEffect(() => {
     for (const sec of weekSections) {
@@ -1074,8 +1105,8 @@ export default function AgendaView({
   };
 
   const jumpWeek = (delta) => {
-    const base = mode === 'week' ? anchorKey : selectedDay;
-    const next = addDays(base, delta * 7);
+    const next = addDays(stripStart, delta * 7);
+    setStripStart(next);
     setAnchorKey(next);
     setSelectedDay(next);
   };
@@ -1102,6 +1133,7 @@ export default function AgendaView({
   const jumpToday = () => {
     setSelectedDay(todayKey);
     setAnchorKey(todayKey);
+    setStripStart(todayKey);
   };
 
   const toggleMic = () => {
@@ -1153,9 +1185,7 @@ export default function AgendaView({
     return { period: p, canUp: idx > 0, canDown: idx < list.length - 1 };
   })();
 
-  const weekNavLabel = weekRangePretty(
-    weekStripFor(mode === 'week' ? anchorKey : selectedDay),
-  );
+  const weekNavLabel = weekRangePretty(week);
 
   return (
     <div className="view agenda-view notes-view tiimo-agenda">
@@ -1292,7 +1322,9 @@ export default function AgendaView({
 
       {mode !== 'month' ? (
         <DayStrip
-          week={mode === 'week' ? weekStripFor(anchorKey) : week}
+          week={week}
+          onPrev={() => jumpWeek(-1)}
+          onNext={() => jumpWeek(1)}
           selectedDay={selectedDay}
           todayKey={todayKey}
           itemsForDate={itemsForDate}
@@ -1412,6 +1444,7 @@ export default function AgendaView({
                     }
                     setSelectedDay(cell.key);
                     setAnchorKey(cell.key);
+                    setStripStart(cell.key);
                     setMode('day');
                   }}
                   aria-label={`${cell.key}${open ? `, ${open} notes` : ''}`}
@@ -1427,7 +1460,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v24</p>
+        <p>Manuel OS · local · v25</p>
       </footer>
 
       <NoteSheet

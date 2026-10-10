@@ -405,7 +405,7 @@ function TodayView({
       </div>
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v24</p>
+        <p>Manuel OS · local · v25</p>
       </footer>
 
       <PhotoViewer view={view} onClose={() => setView(null)} />
@@ -583,7 +583,7 @@ function ProgressView({ weekHonesty, weight, streak, habitInsights }) {
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v24</p>
+        <p>Manuel OS · local · v25</p>
       </footer>
     </div>
   );

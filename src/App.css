@@ -5847,7 +5847,7 @@
 }
 
 .nb-toast {
-  z-index: 230;
+  z-index: 205; /* above the editor, below sheets so it never covers sheet buttons */
 }
 
 /* Wide: sidebar + page list + editor */
@@ -5940,5 +5940,536 @@
 
   .nb-body-input {
     min-height: 0;
+  }
+}
+
+/* ========== v25: day strip — the opened day comes first ========== */
+.tiimo-week-strip.v25 {
+  gap: 4px;
+  padding: 2px 0 10px;
+  touch-action: pan-y;
+}
+
+.tiimo-week-strip.v25 .tiimo-week-day {
+  min-height: 64px;
+  padding: 7px 0 6px;
+  border-radius: 16px;
+  color: var(--text-soft);
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.tiimo-week-strip.v25 .tiimo-week-letter {
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tiimo-week-strip.v25 .tiimo-week-num {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Past days: present but quiet */
+.tiimo-week-strip.v25 .tiimo-week-day.past {
+  opacity: 0.4;
+}
+
+/* Today when it isn't the selected day: soft ring */
+.tiimo-week-strip.v25 .tiimo-week-day.is-today:not(.active) {
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px rgba(24, 24, 27, 0.14);
+}
+
+/* Selected day: filled pill, bigger, bolder */
+.tiimo-week-strip.v25 .tiimo-week-day.active {
+  background: var(--text);
+  color: #fff;
+  opacity: 1;
+  box-shadow: 0 6px 16px rgba(24, 24, 27, 0.18);
+}
+
+.tiimo-week-strip.v25 .tiimo-week-day.active .tiimo-week-num {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.tiimo-week-strip.v25 .tiimo-week-day.active .tiimo-week-letter {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tiimo-week-strip.v25 .tiimo-week-day.active .tiimo-week-dot.on {
+  background: #fff;
+}
+
+.tiimo-week-strip.v25 .tiimo-week-day.drop-lit {
+  background: var(--surface-2);
+}
+
+/* v25: 14-day calendar — today gets the weight, past days stay quiet */
+.progress-view .streak-cal-cell {
+  border-radius: 14px;
+}
+
+.progress-view .streak-cal-cell:not(.today):not(.earned) {
+  opacity: 0.6;
+}
+
+.progress-view .streak-cal-cell.today {
+  background: var(--text);
+  box-shadow: 0 6px 16px rgba(24, 24, 27, 0.16);
+}
+
+.progress-view .streak-cal-cell.today .streak-cal-dow,
+.progress-view .streak-cal-cell.today .streak-cal-num {
+  color: #fff;
+}
+
+.progress-view .streak-cal-cell.today .streak-cal-num {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.progress-view .streak-cal-cell.today .streak-cal-dot {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.progress-view .streak-cal-cell.today .streak-flame {
+  color: #fbbf24;
+}
+
+/* ========== v25 Notes — Apple Notes–style, calmer ========== */
+.nf-view {
+  gap: 10px;
+}
+
+.nf-head,
+.nf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.nf-head .tiimo-day-title,
+.nf-folder-head .tiimo-day-title {
+  margin: 0;
+}
+
+.nf-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nf-compose,
+.nf-icon {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.nf-compose:active,
+.nf-icon:active:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.nf-icon:disabled {
+  color: #d4d4d8;
+  cursor: default;
+}
+
+.nf-back {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 8px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  max-width: 55%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nf-back span {
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+.nf-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 0 10px;
+  min-height: 40px;
+  color: var(--muted);
+}
+
+.nf-search input {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  outline: none;
+  padding: 8px 0;
+}
+
+.nf-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.nf-search-clear {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.nf-label {
+  margin: 6px 4px 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Inset grouped list (one card, hairline separators) */
+.nf-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.nf-row-wrap + .nf-row-wrap > button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  border-top: 1px solid rgba(24, 24, 27, 0.07);
+}
+
+.nf-folder-row,
+.nf-note {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.nf-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 14px 8px 16px;
+}
+
+.nf-folder-row:active,
+.nf-note:active {
+  background: var(--bg-soft);
+}
+
+.nf-folder-row.active,
+.nf-note.active {
+  background: var(--surface-2);
+}
+
+.nf-folder {
+  flex-shrink: 0;
+}
+
+.nf-folder-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.98rem;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nf-count {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.nf-chev {
+  color: #c4c4cc;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.nf-new-folder {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  min-height: 44px;
+  align-self: flex-start;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.nf-folder-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -4px;
+}
+
+.nf-folder-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.nf-note {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 16px;
+  min-height: 64px;
+  justify-content: center;
+}
+
+.nf-note-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nf-note-sub {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+
+.nf-note-date {
+  color: var(--text-soft);
+  font-weight: 550;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nf-note-preview {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.nf-note-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.nf-note-folder .nf-folder {
+  width: 14px;
+  height: 14px;
+}
+
+.nf-empty {
+  margin: 8px 4px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.nf-empty-cta {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 16px;
+  min-height: 64px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Editor */
+.nf-editor.full {
+  padding-left: 18px;
+  padding-right: 14px;
+}
+
+.nf-editor-bar {
+  border-bottom: 0;
+}
+
+.nf-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-soft);
+}
+
+.nf-save-error {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--danger);
+  margin-right: 4px;
+}
+
+.nf-editor-date {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 550;
+  color: var(--muted);
+}
+
+.nf-editor .nb-editor-scroll {
+  padding-top: 4px;
+}
+
+.nf-editor .nb-title-input {
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+/* Sheets */
+.nb-menu {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-soft);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.nb-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 550;
+  color: var(--text);
+  min-height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nb-menu-item + .nb-menu-item {
+  border-top: 1px solid rgba(24, 24, 27, 0.07);
+}
+
+.nb-menu-item.danger {
+  color: var(--danger);
+}
+
+.nb-menu-item:disabled {
+  color: #c4c4cc;
+  cursor: default;
+}
+
+.nb-menu-item em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.nb-menu-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notes-toast-undo {
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .nf-layout {
+    grid-template-columns: 280px 320px minmax(0, 1fr);
+    height: calc(100dvh - 120px);
+  }
+
+  .nf-folders-pane {
+    background: var(--bg-soft);
+    border-right: 1px solid var(--border);
+  }
+
+  .nf-notes-pane {
+    border-right: 1px solid var(--border);
+  }
+
+  .nf-pane-title {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .nf-editor.inline {
+    padding: 8px 24px 0;
   }
 }

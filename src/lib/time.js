@@ -144,3 +144,26 @@ export function activePeriodId(hour) {
   if (hour < 17) return 'morning';
   return 'night';
 }
+
+/**
+ * v25: rolling 7-day strip that STARTS on startKey (the day being opened),
+ * e.g. Tue → Wed → … → Mon. Same shape as weekStripFor().
+ */
+export function rollingStrip(startKey, todayKey) {
+  const [y, m, d] = startKey.split('-').map(Number);
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(Date.UTC(y, m - 1, d + i, 12));
+    const key = dt.toISOString().slice(0, 10);
+    days.push({
+      key,
+      dow: names[dt.getUTCDay()],
+      today: key === todayKey,
+      past: todayKey ? key < todayKey : false,
+      empty: false,
+      pct: null,
+    });
+  }
+  return days;
+}
