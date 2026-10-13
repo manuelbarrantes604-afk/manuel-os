@@ -6473,3 +6473,51 @@
     padding: 8px 24px 0;
   }
 }
+
+/* ========== v26 Notes — safety net (Recently Deleted, Backups, Export) ========== */
+.nf-head .nf-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.nf-hint {
+  margin: 4px 4px 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted, #8a8a93);
+}
+.nf-trash-group {
+  margin-top: 12px;
+}
+.nf-sheet-meta {
+  margin: -4px 0 10px;
+  font-size: 0.8rem;
+  color: var(--muted, #8a8a93);
+}
+.nf-preview-body {
+  margin: 0 0 14px;
+  max-height: 38vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f6f6f8;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.nf-note.static {
+  cursor: default;
+}
+.nf-restore .nb-editor-scroll {
+  padding-bottom: 40px;
+}
+.nf-restore .tiimo-day-title {
+  margin: 4px 0 6px;
+}
+.nf-restore-btn {
+  width: 100%;
+  margin: 16px 0 8px;
+  min-height: 50px;
+}

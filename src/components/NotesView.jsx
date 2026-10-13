@@ -1,12 +1,77 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SECTION_COLORS, colorOf } from '../hooks/useNotebook';
+import { NOTEBOOK_KEY, SECTION_COLORS, colorOf } from '../hooks/useNotebook';
+import { listBackups, noteCount, parseBackup } from '../lib/notesBackup';
 
 /*
  * v25 Notes — Apple Notes–style: Folders → Notes → Note.
  * Edit freely (autosave). Undo/Redo while editing, "Undo changes" after you
  * leave a note, and an Undo toast after delete / move.
+ * v26: Recently Deleted (30 days), Restore from backup, Export.
  */
+
+const TRASH_ID = '__trash';
+
+function stamp() {
+  const d = new Date();
+  const z = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
+}
+
+function notebookText(nb) {
+  const out = [`Manuel OS — Notes export (${new Date().toLocaleString('en-US')})`, ''];
+  for (const s of nb.sections) {
+    const pgs = nb.pages.filter((p) => p.sectionId === s.id && !isEmpty(p));
+    out.push(`=== ${s.name} (${pgs.length}) ===`, '');
+    for (const p of pgs) {
+      out.push(`# ${p.title?.trim() || 'Untitled'}`, `(${fmtLong(p.updatedAt)})`, String(p.body || ''), '');
+    }
+  }
+  return out.join('\n');
+}
+
+/** Share sheet on iPhone when possible, else a normal download. */
+async function exportFile(name, text, type) {
+  const blob = new Blob([text], { type });
+  try {
+    const file = new File([blob], name, { type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: name });
+      return 'shared';
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return 'cancelled';
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return 'downloaded';
+}
+
+/** Any other notebook-shaped copies already on this device (old keys etc.). */
+function findOtherCopies() {
+  const found = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (!k || k === NOTEBOOK_KEY || !/note/i.test(k)) continue;
+      try {
+        const v = JSON.parse(localStorage.getItem(k));
+        if (v && Array.isArray(v.sections) && Array.isArray(v.pages)) found.push({ key: k, data: v });
+      } catch {
+        /* not JSON */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return found;
+}
 
 const TOAST_MS = 6500;
 const HISTORY_PAUSE_MS = 700;
@@ -216,6 +281,211 @@ function NoteMenuSheet({ page, sections, canRevert, onMove, onRevert, onDelete, 
   );
 }
 
+function NotesMenuSheet({ onRestore, onExportText, onExportJson, onClose }) {
+  return (
+    <Sheet label="Notes options" onClose={onClose}>
+      <h3 className="nb-sheet-title">Notes</h3>
+      <div className="nb-menu">
+        <button type="button" className="nb-menu-item" onClick={onRestore}>
+          Restore from backup <span aria-hidden="true">⟲</span>
+        </button>
+        <button type="button" className="nb-menu-item" onClick={onExportText}>
+          Export notes (.txt) <span aria-hidden="true">⇪</span>
+        </button>
+        <button type="button" className="nb-menu-item" onClick={onExportJson}>
+          Export backup file (.json) <span aria-hidden="true">⇪</span>
+        </button>
+      </div>
+      <button type="button" className="note-sheet-btn" onClick={onClose}>
+        Cancel
+      </button>
+    </Sheet>
+  );
+}
+
+function daysLeft(iso) {
+  const left = 30 - Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return Math.max(0, left);
+}
+
+function TrashPane({ trash, onBack, onOpen, wide }) {
+  return (
+    <div className="nb-pane nf-notes-pane nf-trash-pane">
+      <div className="nf-bar">
+        {!wide ? (
+          <button type="button" className="nf-back" onClick={onBack}>
+            <span aria-hidden="true">‹</span> Folders
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
+      <div className="nf-folder-head">
+        <h1 className={wide ? 'nf-pane-title' : 'tiimo-day-title'}>Recently Deleted</h1>
+        <span className="nf-folder-count">
+          {trash.length} note{trash.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <p className="nf-hint">Notes are kept here for 30 days. Tap one to recover it.</p>
+      {trash.length ? (
+        <ul className="nf-group">
+          {trash.map((t) => (
+            <li key={t.page.id} className="nf-row-wrap">
+              <button type="button" className="nf-note" onClick={() => onOpen(t)}>
+                <strong className="nf-note-title">{pageTitle(t.page)}</strong>
+                <span className="nf-note-sub">
+                  <span className="nf-note-date">{daysLeft(t.deletedAt)} days</span>
+                  <span className="nf-note-preview">
+                    {t.sectionName ? `${t.sectionName} · ` : ''}
+                    {pagePreview(t.page) || 'No additional text'}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="nf-empty">Nothing here.</p>
+      )}
+    </div>
+  );
+}
+
+function TrashSheet({ item, onRecover, onClose }) {
+  return (
+    <Sheet label="Deleted note" onClose={onClose}>
+      <h3 className="nb-sheet-title">{pageTitle(item.page)}</h3>
+      <p className="nf-sheet-meta">
+        Deleted {fmtLong(item.deletedAt)}
+        {item.sectionName ? ` · from ${item.sectionName}` : ''}
+      </p>
+      <pre className="nf-preview-body">{String(item.page.body || '').slice(0, 1200) || 'No additional text'}</pre>
+      <div className="nb-sheet-row">
+        <button type="button" className="note-sheet-btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="note-sheet-btn done" onClick={onRecover}>
+          Recover
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function fmtBackupTime(ts) {
+  return new Date(ts).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+/** Full-screen list of snapshots → preview → one-tap restore. */
+function RestoreScreen({ currentCount, onRestore, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [pick, setPick] = useState(null);
+  useEffect(() => {
+    let live = true;
+    listBackups().then((r) => {
+      if (!live) return;
+      const others = findOtherCopies().map((o, i) => ({
+        id: `found-${i}`,
+        ts: 0,
+        reason: `Found on this device (${o.key})`,
+        count: noteCount(o.data),
+        folders: o.data.sections.length,
+        json: JSON.stringify(o.data),
+      }));
+      setRows([...others, ...r]);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const data = pick ? parseBackup(pick) : null;
+
+  return createPortal(
+    <div className="nb-editor nf-editor full nf-restore" role="dialog" aria-label="Restore from backup">
+      <div className="nf-bar nf-editor-bar">
+        <button type="button" className="nf-back" onClick={pick ? () => setPick(null) : onClose}>
+          <span aria-hidden="true">‹</span> {pick ? 'Backups' : 'Notes'}
+        </button>
+      </div>
+      <div className="nb-editor-scroll">
+        {!pick ? (
+          <>
+            <h1 className="tiimo-day-title">Backups</h1>
+            <p className="nf-hint">
+              Saved automatically on this phone when you open the app, every 10 minutes while you write, and before anything is
+              deleted or undone. Last {20}. You have {currentCount} note{currentCount === 1 ? '' : 's'} now.
+            </p>
+            {rows == null ? (
+              <p className="nf-empty">Loading…</p>
+            ) : rows.length ? (
+              <ul className="nf-group">
+                {rows.map((r) => (
+                  <li key={r.id} className="nf-row-wrap">
+                    <button type="button" className="nf-note nf-backup-row" onClick={() => setPick(r)}>
+                      <strong className="nf-note-title">{r.ts ? fmtBackupTime(r.ts) : 'Older copy'}</strong>
+                      <span className="nf-note-sub">
+                        <span className="nf-note-date">
+                          {r.count} note{r.count === 1 ? '' : 's'}
+                        </span>
+                        <span className="nf-note-preview">{r.reason}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="nf-empty">No backups yet — the first one is made the next time you open the app or write a note.</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="nf-editor-date">{pick.ts ? fmtBackupTime(pick.ts) : pick.reason}</p>
+            <h1 className="tiimo-day-title">
+              {pick.count} note{pick.count === 1 ? '' : 's'}
+            </h1>
+            {data ? (
+              data.sections.map((s) => {
+                const pgs = data.pages.filter((p) => p.sectionId === s.id && !isEmpty(p));
+                return (
+                  <div key={s.id}>
+                    <p className="nf-label">
+                      {s.name} · {pgs.length}
+                    </p>
+                    {pgs.length ? (
+                      <ul className="nf-group">
+                        {pgs.map((pg) => (
+                          <li key={pg.id} className="nf-row-wrap">
+                            <div className="nf-note static">
+                              <strong className="nf-note-title">{pageTitle(pg)}</strong>
+                              <span className="nf-note-sub">
+                                <span className="nf-note-date">{fmtListDate(pg.updatedAt)}</span>
+                                <span className="nf-note-preview">{pagePreview(pg) || 'No additional text'}</span>
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              })
+            ) : (
+              <p className="nf-empty">This backup can’t be read.</p>
+            )}
+            {data ? (
+              <button type="button" className="note-sheet-btn done nf-restore-btn" onClick={() => onRestore(data, pick)}>
+                Restore this version
+              </button>
+            ) : null}
+            <p className="nf-hint">Your current notes are backed up first, and you can Undo right after.</p>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function NoteRow({ page, folder, active, onOpen, showFolder }) {
   const preview = pagePreview(page);
   return (
@@ -236,7 +506,7 @@ function NoteRow({ page, folder, active, onOpen, showFolder }) {
   );
 }
 
-function FoldersPane({ sections, pages, activeId, onOpen, onNewFolder, onNewNote, query, setQuery, results, onOpenPage, wide }) {
+function FoldersPane({ sections, pages, trashCount, activeId, onOpen, onNewFolder, onNewNote, onMenu, query, setQuery, results, onOpenPage, wide }) {
   const counts = useMemo(() => {
     const m = {};
     for (const p of pages) m[p.sectionId] = (m[p.sectionId] || 0) + 1;
@@ -248,11 +518,16 @@ function FoldersPane({ sections, pages, activeId, onOpen, onNewFolder, onNewNote
     <div className="nb-pane nf-folders-pane">
       <div className="nf-head">
         <h1 className={wide ? 'nf-pane-title' : 'tiimo-day-title'}>{wide ? 'Folders' : 'Notes'}</h1>
+        <span className="nf-bar-right">
+        <button type="button" className="nf-icon" onClick={onMenu} aria-label="Notes options" title="Backups & export">
+          ⋯
+        </button>
         <button type="button" className="nf-compose" onClick={onNewNote} aria-label="New note" title="New note">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <path d="M4 20h4l10-10-4-4L4 16z M13.5 6.5l4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           </svg>
         </button>
+        </span>
       </div>
       <label className="nf-search">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -298,6 +573,22 @@ function FoldersPane({ sections, pages, activeId, onOpen, onNewFolder, onNewNote
               </li>
             ))}
           </ul>
+          {trashCount ? (
+            <ul className="nf-group nf-trash-group">
+              <li className="nf-row-wrap">
+                <button type="button" className={`nf-folder-row ${activeId === TRASH_ID ? 'active' : ''}`} onClick={() => onOpen(TRASH_ID)}>
+                  <svg className="nf-folder" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                    <path d="M5 7h14 M9 7V5h6v2 M7 7l1 12h8l1-12" fill="none" stroke="#8a8a93" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+                  </svg>
+                  <span className="nf-folder-name">Recently Deleted</span>
+                  <span className="nf-count">{trashCount}</span>
+                  <span className="nf-chev" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              </li>
+            </ul>
+          ) : null}
           <button type="button" className="nf-new-folder" onClick={onNewFolder}>
             New Folder
           </button>
@@ -518,6 +809,9 @@ export default function NotesView({ notebook }) {
     deletePage,
     restorePage,
     restoreContent,
+    restoreNotebook,
+    trash,
+    getRaw,
   } = notebook;
   const wide = useMediaQuery('(min-width: 768px)');
   const [sectionId, setSectionId] = useState(null);
@@ -529,8 +823,14 @@ export default function NotesView({ notebook }) {
   // Content of the open note at the moment it was opened (for "Undo changes").
   const openedRef = useRef(null);
 
-  const activeSectionId =
-    sectionId && sections.some((s) => s.id === sectionId) ? sectionId : wide ? sections[0]?.id : null;
+  const inTrash = sectionId === TRASH_ID;
+  const activeSectionId = inTrash
+    ? null
+    : sectionId && sections.some((s) => s.id === sectionId)
+      ? sectionId
+      : wide
+        ? sections[0]?.id
+        : null;
   const activeSection = sections.find((s) => s.id === activeSectionId) || null;
   const page = pages.find((p) => p.id === pageId) || null;
   const pageFolder = page ? sections.find((s) => s.id === page.sectionId) : null;
@@ -560,7 +860,8 @@ export default function NotesView({ notebook }) {
 
   const showToast = (message, undo, undoLabel = 'Undo') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ message, undo, undoLabel });
+    // armedAt: ignore taps in the first moments so a stray tap can't trigger Undo.
+    setToast({ message, undo, undoLabel, armedAt: Date.now() + 450 });
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
   };
 
@@ -581,7 +882,19 @@ export default function NotesView({ notebook }) {
       showToast('Note saved', null);
       return;
     }
-    showToast('Changes saved', () => restoreContent(cur.id, snap), 'Undo changes');
+    const id = cur.id;
+    const after = { title: cur.title, body: cur.body, updatedAt: cur.updatedAt };
+    showToast(
+      'Changes saved',
+      () => {
+        if (!restoreContent(id, snap, after)) {
+          showToast('Note changed since — nothing undone', null);
+          return;
+        }
+        showToast('Changes undone', () => restoreContent(id, after, snap), 'Redo');
+      },
+      'Undo changes',
+    );
   };
 
   const openPage = (id) => {
@@ -617,7 +930,7 @@ export default function NotesView({ notebook }) {
     Boolean(menuPage && opened && opened.id === menuPage.id && !isEmpty(opened)) &&
     (opened.title !== menuPage.title || opened.body !== menuPage.body);
 
-  const showFolders = wide || !activeSectionId;
+  const showFolders = wide || (!activeSectionId && !inTrash);
 
   return (
     <div className={`view nb-view nf-view ${wide ? 'wide' : 'narrow'}`}>
@@ -635,6 +948,8 @@ export default function NotesView({ notebook }) {
               setSectionId(id);
             }}
             onNewFolder={() => setSheet({ type: 'folder-new' })}
+            onMenu={() => setSheet({ type: 'notes-menu' })}
+            trashCount={trash.length}
             onNewNote={() => newNote()}
             query={query}
             setQuery={setQuery}
@@ -643,7 +958,10 @@ export default function NotesView({ notebook }) {
             wide={wide}
           />
         ) : null}
-        {wide || !showFolders ? (
+        {inTrash ? (
+          <TrashPane trash={trash} wide={wide} onBack={() => setSectionId(null)} onOpen={(t) => setSheet({ type: 'trash', item: t })} />
+        ) : null}
+        {!inTrash && (wide || !showFolders) ? (
           <NotesPane
             folder={activeSection}
             pages={folderPages}
@@ -670,7 +988,7 @@ export default function NotesView({ notebook }) {
 
       {!wide && showFolders ? (
         <footer className="mos-footer">
-          <p>Manuel OS · local · v25</p>
+          <p>Manuel OS · local · v26</p>
         </footer>
       ) : null}
 
@@ -739,16 +1057,62 @@ export default function NotesView({ notebook }) {
             const snap = openedRef.current;
             const cur = { title: menuPage.title, body: menuPage.body, updatedAt: menuPage.updatedAt };
             const id = menuPage.id;
-            restoreContent(id, snap);
             setSheet(null);
-            showToast('Reverted', () => restoreContent(id, cur));
+            if (!snap || snap.id !== id || !restoreContent(id, snap, cur)) return;
+            showToast('Reverted', () => restoreContent(id, cur, snap));
           }}
           onDelete={() => {
             const removed = deletePage(menuPage.id);
             openedRef.current = null;
             setSheet(null);
             setPageId(null);
-            if (removed && !isEmpty(removed)) showToast('Note deleted', () => restorePage(removed));
+            if (removed && !isEmpty(removed)) showToast('Moved to Recently Deleted', () => restorePage(removed));
+          }}
+        />
+      ) : null}
+      {sheet?.type === 'notes-menu' ? (
+        <NotesMenuSheet
+          onClose={() => setSheet(null)}
+          onRestore={() => {
+            if (page) closeEditor();
+            setSheet({ type: 'restore' });
+          }}
+          onExportText={async () => {
+            setSheet(null);
+            const r = await exportFile(`notes-${stamp()}.txt`, notebookText(getRaw()), 'text/plain');
+            if (r === 'downloaded') showToast('Notes exported', null);
+          }}
+          onExportJson={async () => {
+            setSheet(null);
+            const r = await exportFile(`notes-backup-${stamp()}.json`, JSON.stringify(getRaw(), null, 2), 'application/json');
+            if (r === 'downloaded') showToast('Backup file saved', null);
+          }}
+        />
+      ) : null}
+      {sheet?.type === 'restore' ? (
+        <RestoreScreen
+          currentCount={pages.filter((p) => !isEmpty(p)).length}
+          onClose={() => setSheet(null)}
+          onRestore={async (data, row) => {
+            const before = await restoreNotebook(data);
+            setSheet(null);
+            setPageId(null);
+            setSectionId(null);
+            openedRef.current = null;
+            if (before) showToast(`Restored ${row.count} note${row.count === 1 ? '' : 's'}`, () => restoreNotebook(before));
+          }}
+        />
+      ) : null}
+      {sheet?.type === 'trash' ? (
+        <TrashSheet
+          item={sheet.item}
+          onClose={() => setSheet(null)}
+          onRecover={() => {
+            const pg = sheet.item.page;
+            restorePage(pg);
+            setSheet(null);
+            const s = sections.find((x) => x.id === pg.sectionId) || sections[0];
+            showToast(`Recovered to ${s?.name || 'Notes'}`, null);
           }}
         />
       ) : null}
@@ -761,8 +1125,9 @@ export default function NotesView({ notebook }) {
                   type="button"
                   className="notes-toast-undo"
                   onClick={() => {
-                    toast.undo();
+                    if (Date.now() < (toast.armedAt || 0)) return;
                     setToast(null);
+                    toast.undo();
                   }}
                 >
                   {toast.undoLabel}
