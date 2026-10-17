@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CHECK_DEFS, DAY_PARTS, IMPROVE_TIPS } from './data/seed';
 import WeatherCard from './components/WeatherCard';
 import AgendaView from './components/AgendaView';
@@ -24,9 +24,9 @@ import './App.css';
 
 const NAV = [
   { id: 'agenda', label: 'Agenda', icon: '☰' },
-  { id: 'notes', label: 'Notes', icon: '✎' },
   { id: 'today', label: 'Today', icon: '◉' },
   { id: 'progress', label: 'Progress', icon: '▦' },
+  { id: 'notes', label: 'Notes', icon: '✎' },
 ];
 
 const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
@@ -150,6 +150,11 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot, renderRow })
   }));
   const passed = rows.filter((r) => r.row?.status === 'PASS').length;
   const total = rows.length;
+  const [foldOpen, setFoldOpen] = useState(false);
+  const openRows = rows.filter((r) => r.row?.status !== 'PASS');
+  const doneRows = rows.filter((r) => r.row?.status === 'PASS');
+  const renderOne = ({ def, row }) =>
+    renderRow?.(def, row) || <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />;
   const glyph = part.id === 'night' ? '☾' : '☀';
   const label = part.id === 'night' ? 'NIGHT' : 'MORNING';
 
@@ -170,13 +175,20 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot, renderRow })
         </div>
       </div>
       <p className="coach-line tiimo-coach">{part.coachLine}</p>
-      <ul className="check-list tiimo-task-list">
-        {rows.map(({ def, row }) =>
-          renderRow?.(def, row) || (
-            <CheckRow key={def.id} def={def} row={row} setStatus={setStatus} />
-          ),
-        )}
-      </ul>
+      {openRows.length ? <ul className="check-list tiimo-task-list">{openRows.map(renderOne)}</ul> : null}
+      {doneRows.length ? (
+        <div className="done-fold">
+          <button
+            type="button"
+            className="done-fold-toggle"
+            aria-expanded={foldOpen}
+            onClick={() => setFoldOpen((v) => !v)}
+          >
+            <span aria-hidden="true">{foldOpen ? '▾' : '▸'}</span> Done ({doneRows.length})
+          </button>
+          {foldOpen ? <ul className="check-list tiimo-task-list">{doneRows.map(renderOne)}</ul> : null}
+        </div>
+      ) : null}
       {footerSlot}
     </article>
   );
@@ -271,6 +283,88 @@ function CloseDayButton({ todayStats, closed, onClose }) {
   );
 }
 
+const NEXT_COPY = {
+  wake: { action: "I'm up", log: true },
+  leave: { action: 'Leaving', log: true },
+  exercise: { action: 'Workout photo', photo: true },
+};
+
+/** v28: calm summary + one-tap "Next up" at the top of Today. */
+function TodaySummary({ today, streak, logProof, setStatus, allPass }) {
+  const order = DAY_PARTS.flatMap((p) => p.checkIds);
+  const total = order.length;
+  const done = order.filter((id) => today.checks[id]?.status === 'PASS').length;
+  const nextId = order.find((id) => (today.checks[id]?.status || 'PENDING') === 'PENDING') || null;
+  const def = nextId ? CHECK_BY_ID[nextId] : null;
+  const prev = useRef(done);
+  const [msg, setMsg] = useState(null);
+  const [pop, setPop] = useState(0);
+
+  useEffect(() => {
+    if (done > prev.current) {
+      setMsg(`${['Nice', 'Good', 'Solid', 'Yes'][done % 4]} — ${done} of ${total}`);
+      setPop((n) => n + 1);
+      const t = setTimeout(() => setMsg(null), 2600);
+      prev.current = done;
+      return () => clearTimeout(t);
+    }
+    prev.current = done;
+    return undefined;
+  }, [done, total]);
+
+  const act = () => {
+    if (!nextId) return;
+    const c = NEXT_COPY[nextId];
+    if (c?.log) logProof(nextId, new Date());
+    else if (c?.photo) {
+      const el = document.querySelector('#check-exercise');
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      el?.querySelector('.proof-action.photo')?.click();
+    } else setStatus(nextId, 'PASS');
+  };
+
+  return (
+    <section className="today-summary" aria-label="Today summary">
+      <div className="ts-line">
+        <strong className={`ts-count ${pop ? 'pop' : ''}`} key={`c${pop}`}>
+          {done} of {total} done
+        </strong>
+        {streak?.current > 0 ? (
+          <span className="ts-streak" title="Morning streak">
+            <FlameIcon className="streak-flame" /> {streak.current}
+          </span>
+        ) : null}
+      </div>
+      <div className="ts-bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+        <span style={{ width: `${(done / total) * 100}%` }} />
+      </div>
+      <p className={`ts-msg ${msg ? 'on' : ''}`} role="status" aria-live="polite">
+        {msg || '\u00a0'}
+      </p>
+      {def ? (
+        <div className={`next-up ${pop ? 'pop' : ''}`} key={`n${nextId}`}>
+          <div className="next-up-copy">
+            <span className="next-up-kicker">Next up</span>
+            <strong>{def.label}</strong>
+            <span className="next-up-sub">{def.target}</span>
+          </div>
+          <button type="button" className="next-up-btn" onClick={act}>
+            {NEXT_COPY[nextId]?.action || 'Done'}
+          </button>
+        </div>
+      ) : (
+        <div className="next-up complete" role="status">
+          <span className="next-up-check" aria-hidden="true">✓</span>
+          <div className="next-up-copy">
+            <strong>{allPass ? 'Day complete' : 'All logged'}</strong>
+            <span className="next-up-sub">{allPass ? 'Everything done. Rest well.' : 'Every check is logged. Close the day when ready.'}</span>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TodayView({
   today,
   todayPct,
@@ -293,6 +387,7 @@ function TodayView({
     setExercisePhoto,
     clearProof,
   });
+  const allPass = DAY_PARTS.flatMap((p) => p.checkIds).every((id) => today?.checks?.[id]?.status === 'PASS');
   const rulesApply = Boolean(proofSince) && todayKey >= proofSince;
   const now = new Date();
   const openView = (url, takenAt) => setView({ url, takenAt });
@@ -343,6 +438,14 @@ function TodayView({
         <p className="coach-banner">Faith · Health · Discipline · Family</p>
       </header>
 
+      <TodaySummary
+        today={today}
+        streak={streak}
+        logProof={logProof}
+        setStatus={setStatus}
+        allPass={allPass}
+      />
+
       <MorningProofCard
         today={today}
         photoUrl={photo.url}
@@ -363,7 +466,7 @@ function TodayView({
 
       {todayStats.showResults && (
         <>
-          <DayResultCard stats={todayStats} />
+          {allPass ? null : <DayResultCard stats={todayStats} />}
           <ImprovementCard stats={todayStats} />
         </>
       )}
@@ -405,7 +508,7 @@ function TodayView({
       </div>
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v27</p>
+        <p>Manuel OS · local · v28</p>
       </footer>
 
       <PhotoViewer view={view} onClose={() => setView(null)} />
@@ -583,7 +686,7 @@ function ProgressView({ weekHonesty, weight, streak, habitInsights }) {
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v27</p>
+        <p>Manuel OS · local · v28</p>
       </footer>
     </div>
   );

@@ -1550,7 +1550,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v27</p>
+        <p>Manuel OS · local · v28</p>
       </footer>
 
       {focusItem ? (
