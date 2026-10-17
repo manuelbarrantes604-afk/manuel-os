@@ -6521,3 +6521,188 @@
   margin: 16px 0 8px;
   min-height: 50px;
 }
+
+/* ========== v27: quick-action row, Focus mode, Agenda progress ========== */
+.tiimo-task.expanded {
+  flex-wrap: wrap;
+  background: #f8f8fb;
+  border-radius: 18px;
+}
+.tiimo-quick {
+  flex: 0 0 100%;
+  display: flex;
+  justify-content: space-around;
+  gap: 6px;
+  padding: 2px 6px 6px 54px;
+  animation: tq-in 0.16s ease-out;
+}
+@keyframes tq-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.tq-btn {
+  appearance: none;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(24, 24, 27, 0.06), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  color: var(--text-soft);
+  min-width: 56px;
+  min-height: 52px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.tq-btn:active { transform: scale(0.96); }
+.tq-btn.focus { background: #ebe4ff; color: #5b45c4; box-shadow: none; }
+.tiimo-task.expanded .tiimo-task-main { min-height: 44px; }
+
+.focus-root {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: linear-gradient(180deg, #fbfaff 0%, #f1ecff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: tq-in 0.25s ease-out;
+}
+.focus-exit {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 18px;
+  appearance: none;
+  border: 0;
+  background: rgba(24, 24, 27, 0.06);
+  color: var(--text-soft);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 10px 18px;
+  border-radius: 999px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.focus-body {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+}
+.focus-kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.focus-title {
+  margin: 0;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 2.1rem;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+.focus-ring-wrap { position: relative; width: 240px; height: 240px; margin: 6px 0; }
+.focus-ring { width: 100%; height: 100%; }
+.focus-time {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.focus-time strong { font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.focus-time span { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.focus-presets { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.focus-presets-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.focus-presets > div, .focus-controls { display: flex; gap: 10px; justify-content: center; }
+.focus-chip {
+  appearance: none;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  min-height: 46px;
+  min-width: 72px;
+  padding: 0 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.focus-chip.main { background: var(--text); color: #fff; box-shadow: none; min-width: 104px; }
+.focus-chip:disabled { opacity: 0.4; }
+.focus-done-btn {
+  appearance: none;
+  border: 0;
+  margin-top: 8px;
+  width: 100%;
+  min-height: 56px;
+  border-radius: 18px;
+  background: #22c55e;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.focus-done-moment { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: tq-in 0.3s ease-out; }
+.focus-done-moment p { margin: 0; font-family: 'Lora', Georgia, serif; font-size: 1.5rem; color: var(--text); }
+.focus-done-ring { stroke-dasharray: 214; stroke-dashoffset: 214; animation: focus-draw 0.6s ease-out forwards; }
+.focus-done-tick { stroke-dasharray: 60; stroke-dashoffset: 60; animation: focus-draw 0.4s 0.35s ease-out forwards; }
+@keyframes focus-draw { to { stroke-dashoffset: 0; } }
+
+.ag-progress {
+  margin: 6px 0 10px;
+  border-radius: 18px;
+  background: #f8f8fb;
+}
+.ag-progress-head {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--text-soft);
+}
+.ag-progress-title { font-weight: 700; font-size: 0.85rem; color: var(--text); }
+.ag-progress-glance { flex: 1; text-align: left; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.ag-progress-chev { color: var(--muted); font-size: 0.8rem; }
+.ag-progress-body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.ag-progress-toggle { display: inline-flex; align-self: flex-start; background: #ececf1; border-radius: 999px; padding: 3px; }
+.ag-progress-toggle button {
+  appearance: none; border: 0; background: transparent; font: inherit; font-weight: 700; font-size: 0.78rem;
+  color: var(--muted); padding: 6px 16px; border-radius: 999px; cursor: pointer; min-height: 32px;
+}
+.ag-progress-toggle button.active { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.ag-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ag-stat { background: #fff; border-radius: 14px; padding: 10px 6px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.ag-stat strong { font-size: 1.25rem; font-weight: 800; color: var(--text); }
+.ag-stat span { font-size: 0.68rem; color: var(--muted); font-weight: 600; }
+.ag-bars { width: 100%; height: auto; max-height: 130px; }
+.ag-progress-note { margin: 0; font-size: 0.7rem; color: var(--muted); text-align: center; }

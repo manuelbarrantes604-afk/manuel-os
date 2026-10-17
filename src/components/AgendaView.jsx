@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import FocusMode from './FocusMode';
+import AgendaProgress from './AgendaProgress';
+import { loadFocus, saveFocus } from '../lib/focusStore';
 import { formatAgendaDayParts, rollingStrip } from '../lib/time';
 import { addDays, byOrder, monthLabel } from '../hooks/useAgenda';
 import {
@@ -99,7 +102,8 @@ function PastelIcon({ title, size = 40 }) {
   );
 }
 
-function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
+function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder, quick }) {
+  const expanded = Boolean(quick && quick.expandedId === item.id);
   const longTimer = useRef(null);
   const longFired = useRef(false);
   const pressOrigin = useRef(null);
@@ -161,7 +165,8 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
 
   return (
     <li
-      className={`tiimo-task ${item.done ? 'done' : ''} ${moving ? 'moving' : ''}`}
+      className={`tiimo-task ${item.done ? 'done' : ''} ${moving ? 'moving' : ''} ${expanded ? 'expanded' : ''}`}
+      data-task-id={item.id}
       draggable={canDrag}
       onDragStart={
         canDrag
@@ -175,15 +180,17 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
       <button
         type="button"
         className="tiimo-task-main"
-        aria-label={`Edit note: ${item.title}`}
+        aria-label={quick ? `${item.title} — show actions` : `Edit note: ${item.title}`}
         onClick={(e) => {
           e.stopPropagation();
           if (longFired.current) {
             longFired.current = false;
             return;
           }
-          onOpen(item);
+          if (quick) quick.onExpand(expanded ? null : item.id);
+          else onOpen(item);
         }}
+        aria-expanded={quick ? expanded : undefined}
         onPointerDown={(e) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
           longFired.current = false;
@@ -215,6 +222,7 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
           <strong className="tiimo-task-title">{item.title}</strong>
         </span>
       </button>
+      {quick ? null : (
       <button
         type="button"
         className="tiimo-edit-btn"
@@ -228,6 +236,7 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
         </span>
         <span className="tiimo-edit-label">Edit</span>
       </button>
+      )}
       <button
         type="button"
         className="tiimo-check"
@@ -245,6 +254,26 @@ function NoteRow({ item, onToggle, onOpen, moving, canDrag, reorder }) {
       >
         {item.done ? '✓' : ''}
       </button>
+      {expanded ? (
+        <div className="tiimo-quick" role="group" aria-label={`Actions for ${item.title}`}>
+          <button type="button" className="tq-btn" aria-label="Delete" onClick={() => quick.onTrash(item)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12M10 11v5M14 11v5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span>Delete</span>
+          </button>
+          <button type="button" className="tq-btn" aria-label="Edit" onClick={() => quick.onEdit(item)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg>
+            <span>Edit</span>
+          </button>
+          <button type="button" className="tq-btn" aria-label="Move to another day" onClick={() => quick.onMove(item)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7" /><path d="M4 10h16M8 3.5v3M16 3.5v3M10 14.5h4m-2-2l2 2-2 2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span>Move</span>
+          </button>
+          <button type="button" className="tq-btn focus" aria-label="Focus" onClick={() => quick.onFocus(item)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.7" /><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.7" /></svg>
+            <span>Focus</span>
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -263,6 +292,7 @@ function PeriodGroup({
   onStartReorder,
   onEndReorder,
   onMoveItem,
+  quick,
 }) {
   const count = items.length;
   const meta = PERIODS.find((p) => p.id === period) || PERIODS[1];
@@ -341,6 +371,7 @@ function PeriodGroup({
                   onToggle={onToggle}
                   onOpen={onOpen}
                   moving={movingId === it.id}
+                  quick={reordering ? null : quick}
                   canDrag={canDrag && !reordering}
                   reorder={
                     reordering
@@ -723,6 +754,9 @@ export default function AgendaView({
   const [redoStack, setRedoStack] = useState([]);
   const [toast, setToast] = useState(null);
   const [reorderPeriod, setReorderPeriod] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [focusId, setFocusId] = useState(() => loadFocus()?.id || null);
+  const focusTimerRef = useRef(loadFocus()?.timer || null);
   const [openPeriods, setOpenPeriods] = useState({
     morning: true,
     afternoon: true,
@@ -1187,6 +1221,49 @@ export default function AgendaView({
 
   const weekNavLabel = weekRangePretty(week);
 
+  // v27: collapse the quick-action row on outside tap, view change, reorder or move.
+  useEffect(() => {
+    if (!expandedId) return undefined;
+    const on = (e) => {
+      if (!e.target.closest?.(`[data-task-id="${expandedId}"]`)) setExpandedId(null);
+    };
+    document.addEventListener('pointerdown', on, true);
+    return () => document.removeEventListener('pointerdown', on, true);
+  }, [expandedId]);
+  useEffect(() => {
+    setExpandedId(null);
+  }, [selectedDay, mode, reorderPeriod, movingId]);
+
+  const quick = {
+    expandedId,
+    onExpand: setExpandedId,
+    onTrash: (it) => {
+      setExpandedId(null);
+      doRemove(it);
+    },
+    onEdit: (it) => {
+      setExpandedId(null);
+      openSheet(it);
+    },
+    onMove: (it) => {
+      setExpandedId(null);
+      startMove(it.id);
+    },
+    onFocus: (it) => {
+      setExpandedId(null);
+      remember(it);
+      focusTimerRef.current = null;
+      saveFocus({ id: it.id, title: it.title, timer: null });
+      setFocusId(it.id);
+    },
+  };
+  const focusItem = focusId ? lookup(focusId) || (loadFocus()?.id === focusId ? { id: focusId, title: loadFocus().title, done: false } : null) : null;
+  const closeFocus = () => {
+    saveFocus(null);
+    focusTimerRef.current = null;
+    setFocusId(null);
+  };
+
   return (
     <div className="view agenda-view notes-view tiimo-agenda">
       <header className="tiimo-topbar">
@@ -1343,6 +1420,17 @@ export default function AgendaView({
         </p>
       ) : null}
 
+      {mode !== 'month' ? (
+        <AgendaProgress
+          week={week}
+          selectedDay={selectedDay}
+          todayKey={todayKey}
+          itemsForDate={itemsForDate}
+          dayItems={dayItems}
+          viewMode={mode}
+        />
+      ) : null}
+
       {counts?.overdue ? (
         <p className="tiimo-overdue-hint">{counts.overdue} overdue</p>
       ) : null}
@@ -1371,6 +1459,7 @@ export default function AgendaView({
               }}
               onEndReorder={() => setReorderPeriod(null)}
               onMoveItem={(id, dir) => shiftInSection(p.id, id, dir)}
+              quick={quick}
             />
           ))}
         </div>
@@ -1408,6 +1497,7 @@ export default function AgendaView({
                       onToggle={toggle}
                       onOpen={openSheet}
                       moving={movingId === it.id}
+                      quick={quick}
                       canDrag={canDrag}
                     />
                   ))}
@@ -1460,8 +1550,26 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v26</p>
+        <p>Manuel OS · local · v27</p>
       </footer>
+
+      {focusItem ? (
+        <FocusMode
+          key={focusItem.id}
+          item={focusItem}
+          initial={focusTimerRef.current}
+          onChange={(t) => {
+            focusTimerRef.current = t;
+            saveFocus({ id: focusItem.id, title: focusItem.title, timer: t });
+          }}
+          onExit={closeFocus}
+          onDone={() => {
+            const cur = lookup(focusItem.id);
+            if (cur && !cur.done) toggle(focusItem.id);
+            closeFocus();
+          }}
+        />
+      ) : null}
 
       <NoteSheet
         item={sheetItem}
