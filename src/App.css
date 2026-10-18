@@ -6523,3 +6523,16 @@
 .today-view .next-up { padding: 12px 12px 12px 16px; }
 .today-view .tiimo-period { margin-top: 6px; }
 .today-view .tiimo-task { min-height: 52px; }
+
+/* ========== v30: 2-tab floating nav ========== */
+.bottom-nav.tiimo-nav.tabs-2 {
+  grid-template-columns: repeat(2, 1fr);
+  padding: 6px;
+  gap: 6px;
+  width: min(300px, calc(100% - 48px));
+}
+.bottom-nav.tiimo-nav.tabs-2 button {
+  min-height: 52px;
+  justify-content: center;
+}
+.bottom-nav.tiimo-nav.tabs-2 .nav-label { font-size: 0.78rem; white-space: nowrap; }

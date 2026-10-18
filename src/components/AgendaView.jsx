@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import FocusMode from './FocusMode';
-import AgendaProgress from './AgendaProgress';
 import { loadFocus, saveFocus } from '../lib/focusStore';
 import { formatAgendaDayParts, rollingStrip } from '../lib/time';
 import { addDays, byOrder, monthLabel } from '../hooks/useAgenda';
@@ -736,7 +735,6 @@ export default function AgendaView({
   setPeriod,
   setOrders,
   focusComposer,
-  streak,
 }) {
   const [mode, setMode] = useState('day');
   const [selectedDay, setSelectedDay] = useState(todayKey);
@@ -1267,18 +1265,7 @@ export default function AgendaView({
   return (
     <div className="view agenda-view notes-view tiimo-agenda">
       <header className="tiimo-topbar">
-        <div className="tiimo-chips">
-          {streak ? (
-            <span className="tiimo-streak-chip" title="Day streak">
-              <span aria-hidden="true">🔥</span> {streak.current}
-            </span>
-          ) : null}
-          {streak ? (
-            <span className="tiimo-xp-chip" title="Lifetime XP">
-              ✦ {streak.xp}
-            </span>
-          ) : null}
-        </div>
+        <span />
         <button
           type="button"
           className="tiimo-add-btn"
@@ -1420,17 +1407,6 @@ export default function AgendaView({
         </p>
       ) : null}
 
-      {mode !== 'month' ? (
-        <AgendaProgress
-          week={week}
-          selectedDay={selectedDay}
-          todayKey={todayKey}
-          itemsForDate={itemsForDate}
-          dayItems={dayItems}
-          viewMode={mode}
-        />
-      ) : null}
-
       {counts?.overdue ? (
         <p className="tiimo-overdue-hint">{counts.overdue} overdue</p>
       ) : null}
@@ -1550,7 +1526,7 @@ export default function AgendaView({
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v29</p>
+        <p>Manuel OS · local · v30</p>
       </footer>
 
       {focusItem ? (

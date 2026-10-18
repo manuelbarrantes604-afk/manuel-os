@@ -988,7 +988,7 @@ export default function NotesView({ notebook }) {
 
       {!wide && showFolders ? (
         <footer className="mos-footer">
-          <p>Manuel OS · local · v29</p>
+          <p>Manuel OS · local · v30</p>
         </footer>
       ) : null}
 
