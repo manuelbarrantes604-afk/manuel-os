@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHECK_DEFS, DAY_PARTS, IMPROVE_TIPS } from './data/seed';
-import WeatherCard from './components/WeatherCard';
 import AgendaView from './components/AgendaView';
 import { useCheckins } from './hooks/useCheckins';
 import { useAgenda } from './hooks/useAgenda';
-import { useWeather } from './hooks/useWeather';
 import { useDailyWeight } from './hooks/useDailyWeight';
 import { useNotebook } from './hooks/useNotebook';
 import { WeightEntry, WeightWeekCard } from './components/Weight';
@@ -36,28 +34,12 @@ const CHECK_BY_ID = Object.fromEntries(CHECK_DEFS.map((d) => [d.id, d]));
  * - Today:   day closed OR all morning+night checks graded (no PENDING)
  * - Progress: week start or end weight entered (Fri→Fri)
  * - Agenda:  tended if zero overdue (does NOT block Close day)
- * Weather is NOT a Pass/Fail check. Agenda never blocks Close day.
+ * Agenda never blocks Close day.
  */
 function statusClass(s) {
   if (s === 'PASS') return 'pass';
   if (s === 'FAIL') return 'fail';
   return 'pending';
-}
-
-function greetingForHour(h) {
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function ScorePill({ pct }) {
-  const tone =
-    pct == null ? 'muted' : pct >= 80 ? 'hot' : pct >= 50 ? 'mid' : 'cold';
-  return (
-    <span className={`score-pill tone-${tone}`}>
-      {pct == null ? '—' : `${pct}%`}
-    </span>
-  );
 }
 
 /** Flame icon for streak accents (inline SVG, light UI). */
@@ -174,7 +156,6 @@ function PeriodCard({ part, today, setStatus, isActive, footerSlot, renderRow })
           {isActive ? <span className="now-badge">Now</span> : null}
         </div>
       </div>
-      <p className="coach-line tiimo-coach">{part.coachLine}</p>
       {openRows.length ? <ul className="check-list tiimo-task-list">{openRows.map(renderOne)}</ul> : null}
       {doneRows.length ? (
         <div className="done-fold">
@@ -329,6 +310,9 @@ function TodaySummary({ today, streak, logProof, setStatus, allPass }) {
         <strong className={`ts-count ${pop ? 'pop' : ''}`} key={`c${pop}`}>
           {done} of {total} done
         </strong>
+        <span className={`ts-msg ${msg ? 'on' : ''}`} role="status" aria-live="polite">
+          {msg || ''}
+        </span>
         {streak?.current > 0 ? (
           <span className="ts-streak" title="Morning streak">
             <FlameIcon className="streak-flame" /> {streak.current}
@@ -338,9 +322,6 @@ function TodaySummary({ today, streak, logProof, setStatus, allPass }) {
       <div className="ts-bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
         <span style={{ width: `${(done / total) * 100}%` }} />
       </div>
-      <p className={`ts-msg ${msg ? 'on' : ''}`} role="status" aria-live="polite">
-        {msg || '\u00a0'}
-      </p>
       {def ? (
         <div className={`next-up ${pop ? 'pop' : ''}`} key={`n${nextId}`}>
           <div className="next-up-copy">
@@ -367,12 +348,10 @@ function TodaySummary({ today, streak, logProof, setStatus, allPass }) {
 
 function TodayView({
   today,
-  todayPct,
   todayStats,
   setStatus,
   closeDay,
   ny,
-  weather,
   streak,
   todayKey,
   proofSince,
@@ -414,28 +393,12 @@ function TodayView({
   return (
     <div className="view today-view">
       <header className="today-header tiimo-today-header">
-        <div className="tiimo-topbar">
-          <div className="tiimo-chips">
-            <span className="tiimo-streak-chip" title="Day streak">
-              <span aria-hidden="true">🔥</span> {streak.current}
-            </span>
-            <span className="tiimo-xp-chip" title="Lifetime XP">
-              ✦ {streak.xp}
-            </span>
-            <ScorePill pct={todayPct} />
-          </div>
-        </div>
         <div className="tiimo-day-head">
           <h1 className="tiimo-day-title">Today</h1>
           <span className="tiimo-month-link static">
             {today?.label || 'Today'}
           </span>
         </div>
-        <p className="hello">{greetingForHour(ny.hour)}, Manuel</p>
-        {weather.metaLine ? (
-          <p className="weather-meta">{weather.metaLine}</p>
-        ) : null}
-        <p className="coach-banner">Faith · Health · Discipline · Family</p>
       </header>
 
       <TodaySummary
@@ -452,16 +415,6 @@ function TodayView({
         earned={streak.todayEarned}
         rulesApply={rulesApply}
         onView={openView}
-      />
-
-      <WeatherCard
-        locId={weather.locId}
-        setLocId={weather.setLocId}
-        data={weather.data}
-        status={weather.status}
-        errorMsg={weather.errorMsg}
-        morningBrief={weather.morningBrief}
-        refresh={weather.refresh}
       />
 
       {todayStats.showResults && (
@@ -508,7 +461,7 @@ function TodayView({
       </div>
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v28</p>
+        <p>Manuel OS · local · v29</p>
       </footer>
 
       <PhotoViewer view={view} onClose={() => setView(null)} />
@@ -686,7 +639,7 @@ function ProgressView({ weekHonesty, weight, streak, habitInsights }) {
       ) : null}
 
       <footer className="mos-footer">
-        <p>Manuel OS · local · v28</p>
+        <p>Manuel OS · local · v29</p>
       </footer>
     </div>
   );
@@ -697,7 +650,6 @@ export default function App() {
     days,
     today,
     todayKey,
-    todayPct,
     todayStats,
     weekHonesty,
     habitInsights,
@@ -712,7 +664,6 @@ export default function App() {
   const streak = useStreak(days, todayKey, proofSince);
   const weight = useDailyWeight(todayKey);
   const notebook = useNotebook();
-  const weather = useWeather(ny.hour);
   const agenda = useAgenda(todayKey);
   const [tab, setTab] = useState('agenda');
   const [focusComposer, setFocusComposer] = useState(false);
@@ -744,12 +695,10 @@ export default function App() {
           {tab === 'today' && (
             <TodayView
               today={today}
-              todayPct={todayPct}
               todayStats={todayStats}
               setStatus={setStatus}
               closeDay={closeDay}
               ny={ny}
-              weather={weather}
               streak={streak}
               todayKey={todayKey}
               proofSince={proofSince}
